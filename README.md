@@ -13,7 +13,7 @@ https://developers.google.com/transit/gtfs/reference?csw=1#agencytxt
 1. [**agency.txt**](http://code.google.com/transit/spec/transit_feed_specification.html#agency_txt___Field_Definitions) - basic agency information
 2. [**stops.txt**](http://code.google.com/transit/spec/transit_feed_specification.html#stops_txt___Field_Definitions) - list of stop locations for bus and train, also includes parent station info for trains
 3. [**routes.txt**](http://code.google.com/transit/spec/transit_feed_specification.html#routes_txt___Field_Definitions) - route list with unique identifiers
-4. **[trips.txt]()** - has information about each trip taken by a CTA vehicle
+4. **trips.txt** - has information about each trip taken by a CTA vehicle
 5. [**stop_times.txt**](http://code.google.com/transit/spec/transit_feed_specification.html#stop_times_txt___Field_Definitions) - scheduled arrival/departure times for each stop on each trip
 6. [**calendar.txt**](http://code.google.com/transit/spec/transit_feed_specification.html#calendar_txt___Field_Definitions) - defines which service IDs operate on which days
 7. [**calendar_dates.txt**](http://code.google.com/transit/spec/transit_feed_specification.html#calendar_dates_txt___Field_Definitions) - has exceptions to calendar (such as a holiday when a Sunday schedule is operated)
