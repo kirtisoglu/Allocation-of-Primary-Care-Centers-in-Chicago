@@ -1,0 +1,33 @@
+# UNDER CONSTRUCTION...
+
+**CTA Data:**
+
+**# Explain data**
+
+Uploading date 1/31/2024 11:12 PM
+
+https://developers.google.com/transit/gtfs/reference?csw=1#agencytxt
+
+**Output Format in the [CTA GTFS Feed](https://www.transitchicago.com/developers/gtfs/)**
+
+1. [**agency.txt**](http://code.google.com/transit/spec/transit_feed_specification.html#agency_txt___Field_Definitions) - basic agency information
+2. [**stops.txt**](http://code.google.com/transit/spec/transit_feed_specification.html#stops_txt___Field_Definitions) - list of stop locations for bus and train, also includes parent station info for trains
+3. [**routes.txt**](http://code.google.com/transit/spec/transit_feed_specification.html#routes_txt___Field_Definitions) - route list with unique identifiers
+4. **trips.txt** - has information about each trip taken by a CTA vehicle
+5. [**stop_times.txt**](http://code.google.com/transit/spec/transit_feed_specification.html#stop_times_txt___Field_Definitions) - scheduled arrival/departure times for each stop on each trip
+6. [**calendar.txt**](http://code.google.com/transit/spec/transit_feed_specification.html#calendar_txt___Field_Definitions) - defines which service IDs operate on which days
+7. [**calendar_dates.txt**](http://code.google.com/transit/spec/transit_feed_specification.html#calendar_dates_txt___Field_Definitions) - has exceptions to calendar (such as a holiday when a Sunday schedule is operated)
+8. [**shapes.txt**](http://code.google.com/transit/spec/transit_feed_specification.html#shapes_txt___Field_Definitions) - defines how to draw a route line on a map
+9. [**frequencies.txt**](http://code.google.com/transit/spec/transit_feed_specification.html#frequencies_txt___Field_Definitions) - defines headways when trips aren't specifically scheduled, but sent as-needed (such as service that follows a major event)
+10. [**transfers.txt**](http://code.google.com/transit/spec/transit_feed_specification.html#transfers_txt___Field_Definitions) - has additional information to guide trip planners into identifying two stops as a transfer point and how much extra time to give people to transfer between services
+
+
+
+2020 Illinois boundary data at block level is removed due to its size. It is obtained from https://redistrictingdatahub.org/state/illinois
+We extract its Chicago subdata by matching with 2020 Chicago tract IDs provided by City of Chicago [here.](https://www.chicago.gov/content/dam/city/depts/fin/municipal_depository/ Addendum_2_Attachment_A_Chicago_Census_Tract%20_11_digit.pdf) We clean and save that pdf as chicago_tracts.csv in our data folder.
+
+
+
+
+
+

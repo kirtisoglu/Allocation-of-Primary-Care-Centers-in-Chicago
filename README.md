@@ -1,22 +1,61 @@
-# Allocation-of-Primary-Care-Centers-in-Chicago
+```markdown
+# Allocation of Primary Care Centers in Chicago Area (Under Construction...)
 
-**CTA Data:**
+This project aims to optimize the allocation of primary care centers in Chicago using advanced data analysis and optimization techniques.
 
-**# Explain data**
+## Prerequisites
 
-Uploading date 1/31/2024 11:12 PM
+Before you begin, ensure you have Python installed on your system. This project is developed using Python 3.12. While it is likely that earlier versions of Python 3 may also work, they have not been tested and thus cannot be guaranteed to be fully compatible. For best results, using Python 3.12 or higher is recommended.
 
-https://developers.google.com/transit/gtfs/reference?csw=1#agencytxt
+## Installation
 
-**Output Format in the [CTA GTFS Feed](https://www.transitchicago.com/developers/gtfs/)**
+Pipenv is used for managing project dependencies and virtual environments. Follow these steps to set up the project environment using Pipenv:
 
-1. [**agency.txt**](http://code.google.com/transit/spec/transit_feed_specification.html#agency_txt___Field_Definitions) - basic agency information
-2. [**stops.txt**](http://code.google.com/transit/spec/transit_feed_specification.html#stops_txt___Field_Definitions) - list of stop locations for bus and train, also includes parent station info for trains
-3. [**routes.txt**](http://code.google.com/transit/spec/transit_feed_specification.html#routes_txt___Field_Definitions) - route list with unique identifiers
-4. **trips.txt** - has information about each trip taken by a CTA vehicle
-5. [**stop_times.txt**](http://code.google.com/transit/spec/transit_feed_specification.html#stop_times_txt___Field_Definitions) - scheduled arrival/departure times for each stop on each trip
-6. [**calendar.txt**](http://code.google.com/transit/spec/transit_feed_specification.html#calendar_txt___Field_Definitions) - defines which service IDs operate on which days
-7. [**calendar_dates.txt**](http://code.google.com/transit/spec/transit_feed_specification.html#calendar_dates_txt___Field_Definitions) - has exceptions to calendar (such as a holiday when a Sunday schedule is operated)
-8. [**shapes.txt**](http://code.google.com/transit/spec/transit_feed_specification.html#shapes_txt___Field_Definitions) - defines how to draw a route line on a map
-9. [**frequencies.txt**](http://code.google.com/transit/spec/transit_feed_specification.html#frequencies_txt___Field_Definitions) - defines headways when trips aren't specifically scheduled, but sent as-needed (such as service that follows a major event)
-10. [**transfers.txt**](http://code.google.com/transit/spec/transit_feed_specification.html#transfers_txt___Field_Definitions) - has additional information to guide trip planners into identifying two stops as a transfer point and how much extra time to give people to transfer between services
+```bash
+# Install Pipenv
+pip install pipenv
+
+# Clone the Project Repository
+git clone https://github.com/kirtisoglu/Allocation-of-Primary-Care-Centers-in-Chicago
+cd Allocation-of-Primary-Care-Centers-in-Chicago
+
+#Set Up the Environment
+pipenv install
+
+# Activate the Virtual Environment
+pipenv shell
+
+#Deactivate the Environment:
+exit
+```
+
+## DATA
+
+This project utilizes several datasets to analyze and optimize the allocation of resources in Chicago Area. Data is not stored within the project repository due to its size. Ensure you follow data setup instructions in [data.txt](data.txt) to properly configure your environment for data handling.
+
+## Running the Project
+
+To run the project scripts, ensure you are within the activated Pipenv environment and execute Python scripts as follows:
+
+```bash
+python file_script.py
+```
+
+Replace `file_script.py` with the actual script file you want to execute.
+
+## Contributing
+
+Contributors are welcome! Please fork the repository and submit pull requests with your proposed changes. Ensure you follow the project's code style and guidelines.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE.txt](LICENSE.txt) file for details.
+
+
+
+
+
+
+
+
+

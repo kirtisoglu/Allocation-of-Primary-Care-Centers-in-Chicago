@@ -1,2 +1,16 @@
 
-/google_transit
+google_transit/
+prepared_data/
+data_prep/
+data/
+.vscode/
+
+
+.ipynb_checkpoints/
+__pycache__/
+*.py[cod]
+
+*.egg-info/
+
+Markov_Chain/Validity.py
+Markov_Chain/tree_old.py

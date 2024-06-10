@@ -1,0 +1,9 @@
+{
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/.ipynb_checkpoints": true,
+        "**/.vscode": true,
+        "**/__init__.py": false,  // typically, you might want to see these files
+        "**/my_package.egg-info":
+    }
+}
