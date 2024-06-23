@@ -52,12 +52,8 @@ class PopulatedGraph:
         self.pop_target = pop_target
         self.epsilon = epsilon
         self.root = self.choose_root()
-<<<<<<< Updated upstream
-        
-=======
     
     # This is not a good way of defining center attributes. Change graph attribute in saved files.    
->>>>>>> Stashed changes
     def is_center(self, node):
         return self.graph.nodes[node].get('is_initial_center', False) 
     
@@ -119,10 +115,7 @@ class PopulatedGraph:
             return None, predecessors, successors
         return deepest_center, predecessors, successors
     
-<<<<<<< Updated upstream
-=======
     
->>>>>>> Stashed changes
     def subtree_nodes(self, node, successors, exclude_tree=None, exclude_pop=None):
         """Finds nodes and total population of subtree under 'node'. If this function has been called
             for one of the children of 'node', we exclude total population and subtree of that child 
@@ -138,39 +131,6 @@ class PopulatedGraph:
             Tuple(Dict, int): Subtree nodes under 'node' and total population of subtree.
         """
         if exclude_tree is None:
-<<<<<<< Updated upstream
-            exclude_tree = {} 
-        
-        subtree_nodes = {node: {node}}
-        subtree_pop = self.population[node]
-        node_list = deque([])
-        print("node_list", node_list)
-        
-        for child in successors[node]:
-            print("successors[node]", successors[node])
-            print("child", child)
-            if child not in exclude_tree:
-                print("child is not in excluded tree")
-                print("node_list", node_list)
-                node_list.append(child)
-                while node_list:
-                    print('node_list with child', node_list)
-                    subnode = node_list.popleft()
-                    print("subnode", subnode)
-                    print("subtree_nodes[node]", subtree_nodes[node])
-                    print("node", node)
-                    print("subtree_nodes", subtree_nodes)
-                    subtree_nodes[node].add(subnode)
-                    subtree_pop += self.population[subnode]  
-                    node_list.append(successors[subnode])      
-            else: 
-                subtree_nodes[node].update(exclude_tree[child])
-                subtree_pop += exclude_pop   
-                    
-        return subtree_nodes, subtree_pop
-
-
-=======
             exclude_tree = {}
             
         subtree_nodes = {node: {node}}
@@ -199,7 +159,6 @@ class PopulatedGraph:
 
 
                       
->>>>>>> Stashed changes
 
 class BipartitionWarning(UserWarning):
     """
@@ -278,24 +237,6 @@ def find_balanced_district(h: PopulatedGraph) -> Dict:
     subtree_nodes, subtree_pop = h.subtree_nodes(deepest_center, succ)
     node = deepest_center
     parent = pred[node] 
-<<<<<<< Updated upstream
-
-    while subtree_pop < h.epsilon * h.pop_target: 
-        if h.is_center(parent) == True: 
-            return None  # Since parent is a center, subtree cannot be extended. subtree_pop is lower than expected. 
-        
-        for sibling in succ[parent]: 
-            if sibling != node:
-                if h.is_center(sibling) == True: # since node is the deepest center, and sibling is in the same level, there is no center under sibling. Checking sibling is enough.
-                    sibling_subtree_nodes, sibling_subtree_pop = h.subtree_nodes(sibling, succ)
-                    if sibling_subtree_pop <  h.epsilon * h.pop_target: 
-                        return None  # we have to add parent to either subtree_nodes or sibling_subtree_nodes. One of them will be out of the population range.
-                    else: 
-                        return sibling_subtree_nodes, sibling_subtree_pop  # sibling_subtree_nodes defines a balanced district.
-                
-        # None of siblings is a center. parent is not a center either.
-        subtree_nodes, subtree_pop = h.subtree_nodes(parent, succ, exclude_tree=subtree_nodes, exclude_pop=subtree_pop) # Exclusion is just for avoiding redundant calculations. 
-=======
     print(f"-----------------------------------BALANCED_DISTRICT: Started with subtree_pop {subtree_pop}-----------------------------------------------")
     while abs(subtree_pop - h.pop_target) > h.epsilon* h.pop_target:
         print(f"Entered while. subtree pop, pop difference and upper bound: {subtree_pop, abs(subtree_pop - h.pop_target), h.epsilon*h.pop_target}")
@@ -334,7 +275,6 @@ def find_balanced_district(h: PopulatedGraph) -> Dict:
         if subtree_pop > (1 + h.epsilon) * h.pop_target:
             return None
 
->>>>>>> Stashed changes
         node = parent
         parent = pred[parent]
         
@@ -349,29 +289,17 @@ def split_district(graph: nx.Graph,
           epsilon: float, 
           max_attempts: int) ->Tuple[Dict, int]:
 
-<<<<<<< Updated upstream
-    attempts = 0
-    
-    while attempts < max_attempts: 
-=======
 
     attempts = 0
     
     while attempts < max_attempts: 
 
         print(f"------------------------------------- SPLIT: ATTEMPT {attempts} & SUCCESS {num_centers} -------------------------------------")
->>>>>>> Stashed changes
         spanning_tree = uniform_spanning_tree(graph)
         h = PopulatedGraph(spanning_tree, num_centers, total_pop, pop_target, epsilon)
         result = find_balanced_district(h)
 
         if result != None: 
-<<<<<<< Updated upstream
-            return result
-        
-        attempts += 1
-        if attempts == 50:
-=======
             #print(f"splitting is done at attempt {attempts}")
             #print("target population", pop_target)
             #print(f"lower bound in splitting {h.epsilon*pop_target}")
@@ -384,7 +312,6 @@ def split_district(graph: nx.Graph,
         attempts += 1
         print(f"-------------------------------------- SPLIT: FAILED. & SUCCESS {num_centers}. ---------------------------------------------")
         if attempts == max_attempts:
->>>>>>> Stashed changes
             warnings.warn(
                 "\nFailed to find a balanced cut after 50 attempts.\n"
                 "If possible, consider enabling pair reselection within your\n"
@@ -392,10 +319,7 @@ def split_district(graph: nx.Graph,
                 "a different pair of districts to try and recombine.",
                 BipartitionWarning,
             )
-<<<<<<< Updated upstream
-=======
             return True, True
->>>>>>> Stashed changes
 
     raise RuntimeError(f"Could not find a possible cut after {max_attempts} attempts.")
         
@@ -428,10 +352,7 @@ def recursive_partition(
     districts = {}
     remaining_nodes = graph.node_indices
     pop_target = total_pop / num_centers
-<<<<<<< Updated upstream
-=======
     num_cent = num_centers
->>>>>>> Stashed changes
     # We keep a running tally of deviation from ``epsilon`` at each partition
     # and use it to tighten the population constraints on a per-partition
     # basis such that every partition, including the last partition, has a
@@ -442,13 +363,8 @@ def recursive_partition(
     debt: Union[int, float] = 0
     
     
-<<<<<<< Updated upstream
-    lb_pop = pop_target * (1 - epsilon)
-    ub_pop = pop_target * (1 + epsilon)
-=======
     lb_pop = pop_target * (1 - 2*epsilon)
     ub_pop = pop_target * (1 + 2*epsilon)
->>>>>>> Stashed changes
     check_pop = lambda x: lb_pop <= x <= ub_pop
 
     
@@ -456,17 +372,10 @@ def recursive_partition(
         min_pop = max(pop_target * (1 - epsilon), pop_target * (1 - epsilon) - debt)
         max_pop = min(pop_target * (1 + epsilon), pop_target * (1 + epsilon) - debt)
         new_pop_target = (min_pop + max_pop) / 2
-<<<<<<< Updated upstream
-        epsilon=(max_pop - min_pop) / (2 * new_pop_target)
-
-        try:
-            subtree_nodes, subtree_pop = split_district(graph.subgraph(remaining_nodes), num_centers, 
-=======
         #epsilon=(max_pop - min_pop) / (2 * new_pop_target)
 
         try:
             subtree_nodes, subtree_pop = split_district(graph.subgraph(remaining_nodes), num_cent, 
->>>>>>> Stashed changes
                                                         total_pop, new_pop_target, epsilon, max_attempts)
             
         except Exception:
@@ -474,21 +383,14 @@ def recursive_partition(
 
         if subtree_nodes is None:
             raise BalanceError()
-<<<<<<< Updated upstream
-=======
         
         if  subtree_nodes == True:
             return districts
             
->>>>>>> Stashed changes
 
         for center, node_set in subtree_nodes.items():  # subtree_nodes has only one key. Its value is a set of nodes.
             districts[center] = node_set
             remaining_nodes -= node_set
-<<<<<<< Updated upstream
-            
-            
-=======
             num_cent -= 1
             
         print("------------------------------------------------------RECURSIVE PARTITION: Results------------------------------------------------------------------")   
@@ -496,18 +398,10 @@ def recursive_partition(
         print(f" epsilon: {epsilon}, min_pop: {min_pop}, max_pop:{max_pop}, new_pop_target: {new_pop_target}")
         print(f"number of remaining nodes: {len(remaining_nodes)}. Their total population: {sum(graph.nodes[node]['pop'] for node in remaining_nodes)}")  
 
->>>>>>> Stashed changes
         if not check_pop(subtree_pop):
             raise PopulationBalanceError()
             
         debt += subtree_pop - pop_target
-<<<<<<< Updated upstream
-
-
-    # After making n-2 districts, we need to make sure that the last two districts are both balanced.
-    subtree_nodes, subtree_pop = split_district(graph.subgraph(remaining_nodes), num_centers, 
-                                                total_pop, new_pop_target, epsilon, max_attempts)
-=======
         print(f" Check_pop is valid. Debt in {i+1}.th iteration: {debt}.")
         print("----------------------------------------------RECURSIVE PARTITION: Going to new iteration. ----------------------------------------------------")
     # After making n-2 districts, we need to make sure that the last two districts are both balanced.
@@ -515,7 +409,6 @@ def recursive_partition(
                                                 total_pop, new_pop_target, epsilon, max_attempts)
     
     print(f"n-1.th subtree nodes {subtree_nodes} and their total pop {subtree_pop}")
->>>>>>> Stashed changes
 
     if subtree_nodes is None:
         raise BalanceError()
@@ -523,10 +416,6 @@ def recursive_partition(
     for center, node_set in subtree_nodes.items():
         districts[center] = node_set
         remaining_nodes -= node_set
-<<<<<<< Updated upstream
-
-=======
->>>>>>> Stashed changes
     if not check_pop(subtree_pop):
         raise PopulationBalanceError()
     
@@ -537,11 +426,7 @@ def recursive_partition(
     centers = set()
     for node in remaining_nodes:
         part_pop += graph.nodes[node]['pop']
-<<<<<<< Updated upstream
-        if graph.nodes[node]['phc'] == 1:
-=======
         if graph.nodes[node].get('is_initial_center', False)==True:
->>>>>>> Stashed changes
             centers.add(node)
     
     if len(centers) != 1:
@@ -559,25 +444,9 @@ def recursive_partition(
 """Functions for Intermadiate Steps"""
 
 
+
 # Used in bipartition of a subtree when a spanning tree cannot be found. Kruskal is the fastest algorithm for finding a spanning tree.
 # if edges are not weighted, random weights are assigned. Randomness comes from that operation.
-<<<<<<< Updated upstream
-def random_spanning_tree(
-    graph: nx.Graph, weight_dict: Optional[Dict] = None
-) -> nx.Graph:
-    """
-    Builds a spanning tree chosen by Kruskal's method using random weights.
-
-    :param graph: The input graph to build the spanning tree from.
-    :type graph: Networkx graph
-    :param weight_dict: Dictionary of weights to add to the random weights used in region-aware variants.
-    :type weight_dict: Optional[Dict], optional
-
-    :returns: The maximal spanning tree represented as a Networkx Graph.
-    :rtype: nx.Graph
-    """
-    if weight_dict is None:
-=======
 def random_spanning_tree(graph: nx.Graph) -> nx.Graph:
     """
     Builds a spanning tree chosen by Kruskal's method using random weights.
@@ -586,7 +455,6 @@ def random_spanning_tree(graph: nx.Graph) -> nx.Graph:
     :returns: The maximal spanning tree represented as a Networkx Graph."""
     
     """if weight_dict is None:
->>>>>>> Stashed changes
         weight_dict = dict()
 
     # for not having the same weights for any two edges
@@ -598,15 +466,6 @@ def random_spanning_tree(graph: nx.Graph) -> nx.Graph:
                 and graph.nodes[edge[0]][key] is not None
             ):
                 weight += value
-<<<<<<< Updated upstream
-
-        graph.edges[edge]["random_weight"] = weight
-
-    spanning_tree = tree.maximum_spanning_tree(graph, algorithm="kruskal", weight="random_weight")
-    return spanning_tree
-
-
-=======
         graph.edges[edge]["random_weight"] = weight"""
 
     spanning_tree = tree.maximum_spanning_tree(graph, algorithm="kruskal")
@@ -616,7 +475,6 @@ def random_spanning_tree(graph: nx.Graph) -> nx.Graph:
 
 
 
->>>>>>> Stashed changes
 def balanced_resplit():
     return
 

@@ -61,10 +61,7 @@ from typing import Any, Dict, Optional, Tuple
 
 
 class Partition:
-<<<<<<< Updated upstream
-=======
     
->>>>>>> Stashed changes
     __slots__ = (
         "graph",
         "districts",
@@ -99,12 +96,12 @@ class Partition:
         return self.graph.subgraph(nodes_in_district)
 
 
-    def get_district_population(self, district: str) -> int:
+    def get_population(self, district: str) -> int:
         return sum(self.graph.nodes[node]["pop"] for node in self.districts[district])
 
 
     def calculate_total_populations(self, districts: Dict[str, set]) -> Dict[str, int]:
-        return {district: self.get_district_population(district) for district in districts.keys()}
+        return {district: self.get_population(district) for district in districts.keys()}
 
 
     def calculate_total_travel_time(self, districts: Dict[str, set], travel_times: Dict[Tuple[int, str], float]) -> Dict[str, float]:

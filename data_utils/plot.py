@@ -8,9 +8,6 @@ import plotly.express as px
 
 
 
-<<<<<<< Updated upstream
-
-=======
 class Plot:
 
     def __init__(self) -> None:
@@ -91,7 +88,6 @@ class Plot:
     
     
 """
->>>>>>> Stashed changes
 def fig_blocks(data):
 
     data['constant']=2
@@ -128,45 +124,6 @@ def  add_phc(fig, phc_df):
 
 
 
-<<<<<<< Updated upstream
-def districts(data, centers, attribute: str):
-    # Ensure data[attribute] has appropriate type for indexing
-    data[attribute] = pd.Categorical(data[attribute])
-    
-    # Map each cluster to a color using a cycle of the Plotly qualitative palette
-    colors = px.colors.qualitative.Plotly  # This is an example palette
-    color_map = {cat: colors[i % len(colors)] for i, cat in enumerate(data[attribute].cat.categories)}
-    data['color'] = data[attribute].map(color_map)
-
-    fig = px.choropleth_mapbox(
-        data,
-        geojson=data.geometry.__geo_interface__,
-        locations=data.index,
-        color=data['color'],
-        mapbox_style="open-street-map",
-        center={"lat": data.geometry.centroid.y.mean(), "lon": data.geometry.centroid.x.mean()},
-        height=800,
-        zoom=10,
-        opacity=0.5,
-        color_discrete_map="identity",  # Ensure this uses the direct mapping of assigned colors
-        hover_data=[data['pop']]  # Show population data on hover
-    )
-
-    # Add cluster centers as markers
-    for center in centers:
-        center_point = data.loc[center].geometry.centroid
-        fig.add_scattermapbox(
-            lat=[center_point.y],
-            lon=[center_point.x],
-            mode='markers',
-            marker=dict(size=10, color='black'),  # Black markers for centers
-            name=f'District={center}'
-        )
-
-    return fig.show()
-
-=======
->>>>>>> Stashed changes
 
 
 
@@ -212,7 +169,4 @@ def add_routes(chicago, routes, height):
 
     fig1.show()
 
-<<<<<<< Updated upstream
-=======
 """
->>>>>>> Stashed changes

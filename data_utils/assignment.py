@@ -19,10 +19,6 @@ def assign(graph, data, clusters, attribute: str, question: str):
     data[attribute] = [graph.nodes[node][attribute] for node in data.index]
     data[question] = [graph.nodes[node].get(question, False) for node in data.index]
     
-<<<<<<< Updated upstream
-    return
-=======
->>>>>>> Stashed changes
 
 
 

@@ -16,15 +16,17 @@ class District:
     "graph",
     "districts",
     "flips",
-    "cut_edges",
+    #"cut_edges",
+    "boundaries",
     "populations",
-    "total_travel_times",
+    "max_travel_times",
     "assignment",
     "parent",
 )
 
 
-    def __init__(self, graph: nx.Graph, candidates: set, d, districts: Dict[str, set], travel_times: Dict[Tuple[int, str], float], flips: Optional[Dict[int, str]] = None):
+    def __init__(self, graph: nx.Graph, candidates: set, d, districts: Dict[str, set], travel_times: Dict[Tuple[int, str], float], 
+                 flips: Optional[Dict[int, str]] = None, parent: Optional["District"] = None):
         
         self.graph = graph
         self.closest = self.closest(candidates, travel_times)
@@ -36,9 +38,10 @@ class District:
         
         
         
+        
         self.flips = flips
         self.assignment = self.generate_assignment(districts)
-        self.cut_edges = self.determine_cut_edges()
+        #self.cut_edges = self.determine_cut_edges()
         self.populations = self.calculate_total_populations(districts)
         self.total_travel_times = self.calculate_total_travel_time(districts, travel_times)
         
