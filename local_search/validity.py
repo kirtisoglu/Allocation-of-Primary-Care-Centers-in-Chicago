@@ -1,9 +1,0 @@
-
-
-
-
-
-def bound_teams():
-    
-    
-    

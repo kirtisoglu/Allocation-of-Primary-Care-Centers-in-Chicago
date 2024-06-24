@@ -1,12 +1,4 @@
 import networkx as nx
-<<<<<<< Updated upstream
-from gerrychain import Graph, Partition
-import random
-import copy
-import collections
-
-import random
-=======
 import random
 import copy
 import collections
@@ -14,7 +6,6 @@ import time
 
 import random
 import math
->>>>>>> Stashed changes
 from typing import (
     Any,
     Callable,
@@ -330,40 +321,6 @@ def largest_population_district(partition):
 
 
 
-<<<<<<< Updated upstream
-def random_neighbor(graph, clusters, travel, d_1, d_2, current_populations, current_total_travel):
-    
-    # Create an assignment dict mapping block IDs to district IDs for gerrychain.graph.partition
-    assignment = {node: center for center, nodes in clusters.items() for node in nodes}
-    # Using partition function in gerrychain library, convert clusters to partition that is suitable to the library
-    partition = Partition(graph, assignment=assignment)
-    
-    endpoints = {}
-    for (node_a, node_b) in partition.cut_edges:
-        center_a, center_b = assignment[node_a], assignment[node_b]
-        if center_a != node_a and center_b != node_b:
-            endpoints[(node_a, node_b, center_b)] = ((1/travel[(node_a, center_b)])**d_1)*((1/travel[(node_a, center_a)])**d_2)
-            endpoints[(node_b, node_a, center_a)] = (1/travel[(node_b, center_a)]**d_1)*(1/travel[(node_b, center_b)]**d_2)
-    
-    endpoint_keys, endpoint_values = list(endpoints.keys()), list(endpoints.values())
-            
-    #print("Entering Edge Validation")
-    endpoint_valid = False
-    while not endpoint_valid:
-        random_endpoint = random.choices(endpoint_keys, weights=endpoint_values, k=1)[0]
-        node_origin, node_destination, center_destination = random_endpoint
-        center_origin = assignment[node_origin]
-
-        #if node_origin not in clusters: # avoids moving centers. This is solved above with center_a != node_a ...
-        clusters[center_origin].remove(node_origin)
-        clusters[center_destination].append(node_origin)
-
-        if nx.is_connected(nx.subgraph(graph, clusters[center_origin])):
-            current_populations[center_origin] = current_populations[center_origin] - graph.nodes[node_origin].get('pop')
-            current_populations[center_destination] + graph.nodes[node_origin].get('pop')
-            current_total_travel[center_origin] = current_total_travel[center_origin] - travel[(node_origin, center_origin)]
-            current_total_travel[center_destination] = current_total_travel[center_origin] + travel[(node_origin, center_destination)]
-=======
 def random_neighbor(graph, clusters, travel, d_1, d_2, current_populations, current_total_travel, tabu_set, omega, beta):
     
     # Create an assignment dict mapping block IDs to district IDs for gerrychain.graph.partition
@@ -397,21 +354,14 @@ def random_neighbor(graph, clusters, travel, d_1, d_2, current_populations, curr
             current_populations[destination] += graph.nodes[migrating_node].get('pop')
             current_total_travel[origin] -=  travel[(migrating_node, origin)]
             current_total_travel[destination] += travel[(migrating_node, destination)]
->>>>>>> Stashed changes
             endpoint_valid = True
     
         else:
             # Restore previous state if flip is invalid
-<<<<<<< Updated upstream
-            clusters[center_destination].remove(node_origin)
-            clusters[center_origin].append(node_origin)        
-    return clusters, node_origin, center_origin, center_destination, current_populations, current_total_travel
-=======
             clusters[destination].remove(migrating_node)
             clusters[origin].append(migrating_node) 
                    
     return clusters, migrating_node, origin, destination, current_populations, current_total_travel
->>>>>>> Stashed changes
 
 
 
@@ -538,11 +488,7 @@ def objective_function_simplified(clusters, travel, graph):
     travel_average = total_travel / num_districts
 
     # Calculate objective function components
-<<<<<<< Updated upstream
-    f_1 = sum((abs(populations[center] - pop_average) for center in populations.keys())) / (num_districts * pop_average)
-=======
     f_1 = sum((abs(populations[center] - pop_average) ** 2 for center in populations.keys())) / (num_districts * pop_average)
->>>>>>> Stashed changes
     #f_2 = sum((abs(travel_radius[center] - radius_average) ** 2 for center in travel_radius.keys())) / (num_districts * radius_average)
     f_3 = sum((abs(total_travels[center] - travel_average) ** 2 for center in total_travels.keys())) / (num_districts * travel_average)
     return f_1, f_3
@@ -551,11 +497,7 @@ def objective_function_simplified(clusters, travel, graph):
 
 
 
-<<<<<<< Updated upstream
-def multi_old_bachelor_seed(graph, sources, travel, num_iterations, granularity, a, b, c, alpha, num_inner_iterations, p, d_1, d_2, initial_data = None):
-=======
 def multi_old_bachelor_seed(graph, sources, travel, num_iterations, granularity, a, b, c, alpha, num_inner_iterations, p, d_1, d_2, omega, beta, initial_data = None):
->>>>>>> Stashed changes
 
     iteration_results = {}
     iteration = 0
@@ -587,14 +529,9 @@ def multi_old_bachelor_seed(graph, sources, travel, num_iterations, granularity,
         threshold = 0
         age = 0
         total_moves = 0
-<<<<<<< Updated upstream
-
-        inner_iteration = 0
-=======
         function_time = 0
         inner_iteration = 0
         tabu_set = set()
->>>>>>> Stashed changes
 
 
         while inner_iteration < num_inner_iterations:
@@ -602,19 +539,6 @@ def multi_old_bachelor_seed(graph, sources, travel, num_iterations, granularity,
             #if inner_iteration % 250 == 0:
             #    print("inner_iteration = ", inner_iteration)
             print(f"------ SELECTING NEW MIGRATING NODE ------- Inner Iteration={inner_iteration}")
-<<<<<<< Updated upstream
-            neighbor, migrating_node, center_origin, center_destination, neighbor_populations, neighbor_total_travel = random_neighbor(graph, current_solution, travel, d_1, d_2, current_populations, current_total_travel)
-            neighbor_energy_pop, neighbor_energy_access = objective_function_simplified(neighbor, travel, graph)
-            print(f'Travel time to Center of Origin={travel[(migrating_node, center_origin)]}', f'Travel Time to Center of Destionation={travel[(migrating_node, center_destination)]}')
-            print(f'Current Population Energy={current_energy_pop}', f'Current Access Energy={current_energy_access}')
-            print(f'Migrating Node={migrating_node}', f'Neighbor Population Energy={neighbor_energy_pop}', f'Neighbor Access Energy={neighbor_energy_access}')
-            print(f'Worsening Access Energy={(1 + alpha) * current_energy_access}')
-            print(f'Threshold={threshold}')
-
-            # 3.1. if energy change < T_i, perform the move.
-            if neighbor_energy_access <= (1 + alpha) * current_energy_access and neighbor_energy_pop - current_energy_pop <= threshold:   # worsening?
-                print("Both of the conditions are satisfied.")
-=======
             start_time = time.time()
             neighbor, migrating_node, center_origin, center_destination, neighbor_populations, neighbor_total_travel = random_neighbor(graph, current_solution, travel, d_1, d_2, current_populations, current_total_travel, tabu_set, omega, beta)
             function_time += time.time() - start_time 
@@ -628,7 +552,6 @@ def multi_old_bachelor_seed(graph, sources, travel, num_iterations, granularity,
             # 3.1. if energy change < T_i, perform the move.
             if neighbor_energy_access < (1 + alpha) * current_energy_access and neighbor_energy_pop - current_energy_pop <= threshold:   # worsening?
                 #print("Both of the conditions are satisfied.")
->>>>>>> Stashed changes
                 current_solution = neighbor
                 current_energy_pop = neighbor_energy_pop
                 current_energy_access = neighbor_energy_access
@@ -639,17 +562,6 @@ def multi_old_bachelor_seed(graph, sources, travel, num_iterations, granularity,
 
                 # 3.1.1. if energy change < 0  decrease the threshold: T_{i+1}:= T_i − Δ^{-}(i). --> Only close bad moves will be accepted, since we just found a good solution.
                 if neighbor_energy_pop - current_energy_pop < 0:
-<<<<<<< Updated upstream
-                    print("Population equality is improved.")
-                    age = 0
-                    threshold = ( ( age / a ) ** b - 1) * granularity * (1 - iteration / num_iterations ) ** c 
-
-            # 3.2. Otherwise, Δ >= T_i, increase the threshold: T_{i+1}:= T_i + Δ^{+}(i) --> We should accept worst solutions increasing T_i, since we may be trapped at a local min.
-            else: 
-                print("None of the conditions are satisfied.")
-                age += 1
-                threshold = ( (age / a) ** b - 1) * granularity * (1 - iteration / num_iterations ) ** c 
-=======
                     #print("Population equality is improved.")
                     age = 0
                     threshold = 0
@@ -659,16 +571,11 @@ def multi_old_bachelor_seed(graph, sources, travel, num_iterations, granularity,
                 age += 1
                 threshold = ( (age / a) ** b - 1) * granularity * (1 - iteration / num_iterations ) ** c 
                 #tabu_set.add(migrating_node)
->>>>>>> Stashed changes
 
             inner_iteration += 1
         
         # Save the result of the curent iteration. 
-<<<<<<< Updated upstream
-        iteration_results[iteration] = (initial_solution, current_solution, current_energy_pop, current_energy_access, initial_energy_pop, initial_energy_access)
-=======
         iteration_results[iteration] = (initial_solution, current_solution, current_energy_pop, current_energy_access, initial_energy_pop, initial_energy_access, function_time)
->>>>>>> Stashed changes
 
         # increase the iteration number 
         iteration += 1
@@ -693,15 +600,10 @@ def multi_old_bachelor_seed(graph, sources, travel, num_iterations, granularity,
             current_iteration_initial_pop = iteration_results[iteration + 1][4]
             current_iteration_initial_access = iteration_results[iteration + 1][5]
 
-<<<<<<< Updated upstream
-    # 5. The final solution is the best local optimum found s *
-    return iteration_results, current_iteration_initial, current_iteration_solution, current_iteration_energy_pop, current_iteration_energy_access, current_iteration_initial_pop, current_iteration_initial_access, last, current_populations, current_total_travel, total_moves
-=======
     print(function_time)
     # 5. The final solution is the best local optimum found s *
     return iteration_results, current_iteration_initial, current_iteration_solution, current_iteration_energy_pop, current_iteration_energy_access, current_iteration_initial_pop, current_iteration_initial_access, last, current_populations, current_total_travel, total_moves, tabu_set
 
->>>>>>> Stashed changes
 
 def multi_old_bachelor_seed_simplified(graph, sources, travel, num_iterations, granularity, a, b, c, alpha, num_inner_iterations, p):
     
@@ -743,8 +645,6 @@ def multi_old_bachelor_seed_simplified(graph, sources, travel, num_iterations, g
     best_iteration = min(iteration_results.items(), key=lambda x: (x[1][3], -x[1][2]))
 
     return iteration_results, *best_iteration[1]
-<<<<<<< Updated upstream
-=======
 
 
 
@@ -799,4 +699,3 @@ def update_populations_and_travel(node, origin, destination, graph, travel, popu
     total_travel[destination] += travel.get((node, destination), 0)
 """
 
->>>>>>> Stashed changes

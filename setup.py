@@ -7,11 +7,8 @@ setup(
     name="AllocationOfPrimaryCareCenters",
     version="0.1",
     packages=find_packages(),
-<<<<<<< Updated upstream
-=======
     package_data={'AllocationOfPrimaryCareCenters': ['data/libraries.csv']},
     include_package_data=True,
->>>>>>> Stashed changes
     python_requires='>=3.12',
     install_requires=[
         'pandas==2.2.1',
