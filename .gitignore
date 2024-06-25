@@ -9,3 +9,4 @@ __pycache__/
 *.egg-info/
 Markov_Chain/Validity.py
 Markov_Chain/tree_old.py
+.DS_Store
