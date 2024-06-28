@@ -6,7 +6,7 @@ within a given GeoDataFrame.
 """
 
 from collections import Counter
-from gerrychain.vendor.utm import from_latlon
+from xx_vendor import from_latlon
 
 # from shapely.geometry.base import BaseGeometry
 from geopandas import GeoDataFrame

@@ -49,88 +49,6 @@ from typing import (
 import warnings
 
 
-def predecessors(h: nx.Graph, root: Any) -> Dict:
-    return {a: b for a, b in nx.bfs_predecessors(h, root)}
-
-
-def successors(h: nx.Graph, root: Any) -> Dict:
-    return {a: b for a, b in nx.bfs_successors(h, root)}
-
-
-def random_spanning_tree(
-    graph: nx.Graph, region_surcharge: Optional[Dict] = None
-) -> nx.Graph:
-    """
-    Builds a spanning tree chosen by Kruskal's method using random weights.
-
-    :param graph: The input graph to build the spanning tree from. Should be a Networkx Graph.
-    :type graph: nx.Graph
-    :param region_surcharge: Dictionary of surcharges to add to the random
-        weights used in region-aware variants.
-    :type region_surcharge: Optional[Dict], optional
-
-    :returns: The maximal spanning tree represented as a Networkx Graph.
-    :rtype: nx.Graph
-    """
-    if region_surcharge is None:
-        region_surcharge = dict()
-
-    for edge in graph.edges():
-        weight = random.random()
-        for key, value in region_surcharge.items():
-            # We surcharge edges that cross regions and those that are not in any region
-            if (
-                graph.nodes[edge[0]][key] != graph.nodes[edge[1]][key]
-                or graph.nodes[edge[0]][key] is None
-                or graph.nodes[edge[1]][key] is None
-            ):
-                weight += value
-
-        graph.edges[edge]["random_weight"] = weight
-
-    spanning_tree = tree.minimum_spanning_tree(
-        graph, algorithm="kruskal", weight="random_weight"
-    )
-    return spanning_tree
-
-
-def uniform_spanning_tree(
-    graph: nx.Graph, choice: Callable = random.choice
-) -> nx.Graph:
-    """
-    Builds a spanning tree chosen uniformly from the space of all
-    spanning trees of the graph. Uses Wilson's algorithm.
-
-    :param graph: Networkx Graph
-    :type graph: nx.Graph
-    :param choice: :func:`random.choice`. Defaults to :func:`random.choice`.
-    :type choice: Callable, optional
-
-    :returns: A spanning tree of the graph chosen uniformly at random.
-    :rtype: nx.Graph
-    """
-    root = choice(list(graph.node_indices))
-    tree_nodes = set([root])
-    next_node = {root: None}
-
-    for node in graph.node_indices:
-        u = node
-        while u not in tree_nodes:
-            next_node[u] = choice(list(graph.neighbors(u)))
-            u = next_node[u]
-
-        u = node
-        while u not in tree_nodes:
-            tree_nodes.add(u)
-            u = next_node[u]
-
-    G = nx.Graph()
-    for node in tree_nodes:
-        if next_node[node] is not None:
-            G.add_edge(node, next_node[node])
-
-    return G
-
 
 class PopulatedGraph:
     """
@@ -182,6 +100,9 @@ class PopulatedGraph:
 
     def degree(self, node) -> int:
         return self._degrees[node]
+    
+    def is_center(self, node):
+        return self.graph.nodes[node].get('real_phc', False) 
 
     def contract_node(self, node, parent) -> None:
         self.population[parent] += self.population[node]
@@ -228,7 +149,6 @@ class PopulatedGraph:
             f"epsilon={self.epsilon})"
         )
 
-
 # Tuple that is used in the find_balanced_edge_cuts function
 Cut = namedtuple("Cut", "edge weight subset")
 Cut.__new__.__defaults__ = (None, None, None)
@@ -238,6 +158,259 @@ Cut.weight.__doc__ = "The weight assigned to the edge (if any). Defaults to None
 Cut.subset.__doc__ = (
     "The (frozen) subset of nodes on one side of the cut. Defaults to None."
 )
+
+class BipartitionWarning(UserWarning):
+    """
+    Generally raised when it is proving difficult to find a balanced cut.
+    """
+
+    pass
+
+class ReselectException(Exception):
+    """
+    Raised when the tree-splitting algorithm is unable to find a
+    balanced cut after some maximum number of attempts, but the
+    user has allowed the algorithm to reselect the pair of
+    districts from parent graph to try and recombine.
+    """
+
+    pass
+
+class BalanceError(Exception):
+    """Raised when a balanced cut cannot be found."""
+
+class PopulationBalanceError(Exception):
+    """Raised when the population of a district is outside the acceptable epsilon range."""
+
+
+def predecessors(h: nx.Graph, root: Any) -> Dict:
+    return {a: b for a, b in nx.bfs_predecessors(h, root)}
+
+def successors(h: nx.Graph, root: Any) -> Dict:
+    return {a: b for a, b in nx.bfs_successors(h, root)}
+
+def random_spanning_tree(
+    graph: nx.Graph, region_surcharge: Optional[Dict] = None
+) -> nx.Graph:
+    """
+    Builds a spanning tree chosen by Kruskal's method using random weights.
+
+    :param graph: The input graph to build the spanning tree from. Should be a Networkx Graph.
+    :type graph: nx.Graph
+    :param region_surcharge: Dictionary of surcharges to add to the random
+        weights used in region-aware variants.
+    :type region_surcharge: Optional[Dict], optional
+
+    :returns: The maximal spanning tree represented as a Networkx Graph.
+    :rtype: nx.Graph
+    """
+    if region_surcharge is None:
+        region_surcharge = dict()
+
+    for edge in graph.edges():
+        weight = random.random()
+        for key, value in region_surcharge.items():
+            # We surcharge edges that cross regions and those that are not in any region
+            if (
+                graph.nodes[edge[0]][key] != graph.nodes[edge[1]][key]
+                or graph.nodes[edge[0]][key] is None
+                or graph.nodes[edge[1]][key] is None
+            ):
+                weight += value
+
+        graph.edges[edge]["random_weight"] = weight
+
+    spanning_tree = tree.minimum_spanning_tree(
+        graph, algorithm="kruskal", weight="random_weight"
+    )
+    return spanning_tree
+
+
+
+
+""" ------------------------------  Region-awareness Functions  ----------------------------------- """
+
+def _max_weight_choice(cut_edge_list: List[Cut]) -> Cut:
+    """
+    Each Cut object in the list is assigned a random weight.
+    This random weight is either assigned during the call to
+    the minimum spanning tree algorithm (Kruskal's) algorithm
+    or it is generated during the selection of the balanced edges
+    (cf. :meth:`find_balanced_edge_cuts_memoization` and
+    :meth:`find_balanced_edge_cuts_contraction`).
+    This function returns the cut with the highest weight.
+
+    In the case where a region aware chain is run, this will
+    preferentially select for cuts that span different regions, rather
+    than cuts that are interior to that region (the likelihood of this
+    is generally controlled by the ``region_surcharge`` parameter).
+
+    In any case where the surcharges are either not set or zero,
+    this is effectively the same as calling random.choice() on the
+    list of cuts. Under the above conditions, all of the weights
+    on the cuts are randomly generated on the interval [0,1], and
+    there is no outside force that might make the weight assigned
+    to a particular type of cut higher than another.
+
+    :param cut_edge_list: A list of Cut objects. Each object has an
+        edge, a weight, and a subset attribute.
+    :type cut_edge_list: List[Cut]
+
+    :returns: The cut with the highest random weight.
+    :rtype: Cut
+    """
+
+    # Just in case, default to random choice
+    if not isinstance(cut_edge_list[0], Cut) or cut_edge_list[0].weight is None:
+        return random.choice(cut_edge_list)
+
+    return max(cut_edge_list, key=lambda cut: cut.weight)
+
+
+def _power_set_sorted_by_size_then_sum(d):
+    power_set = [
+        s for i in range(1, len(d) + 1) for s in itertools.combinations(d.keys(), i)
+    ]
+
+    # Sort the subsets in descending order based on
+    # the sum of their corresponding values in the dictionary
+    sorted_power_set = sorted(
+        power_set, key=lambda s: (len(s), sum(d[i] for i in s)), reverse=True
+    )
+
+    return sorted_power_set
+
+
+# Note that the populated graph and the region surcharge are passed
+# by object reference. This means that a copy is not made since we
+# are not modifying the object in the function, and the speed of
+# this randomized selection will not suffer for it.
+def _region_preferred_max_weight_choice(
+    populated_graph: PopulatedGraph, region_surcharge: Dict, cut_edge_list: List[Cut]
+) -> Cut:
+    """
+    This function is used in the case of a region-aware chain. It
+    is similar to the as :meth:`_max_weight_choice` function except
+    that it will preferentially select one of the cuts that has the
+    highest surcharge. So, if we have a weight dict of the form
+    ``{region1: wt1, region2: wt2}`` , then this function first looks
+    for a cut that is a cut edge for both ``region1`` and ``region2``
+    and then selects the one with the highest weight. If no such cut
+    exists, then it will then look for a cut that is a cut edge for the
+    region with the highest surcharge (presumably the region that we care
+    more about not splitting).
+
+    In the case of 3 regions, it will first look for a cut that is a
+    cut edge for all 3 regions, then for a cut that is a cut edge for
+    2 regions sorted by the highest total surcharge, and then for a cut
+    that is a cut edge for the region with the highest surcharge.
+
+    For the case of 4 or more regions, the power set starts to get a bit
+    large, so we default back to the :meth:`_max_weight_choice` function
+    and just select the cut with the highest weight, which will still
+    preferentially select for cuts that span the most regions that we
+    care about.
+
+    :param populated_graph: The populated graph.
+    :type populated_graph: PopulatedGraph
+    :param region_surcharge: A dictionary of surcharges for the spanning
+        tree algorithm.
+    :type region_surcharge: Dict
+    :param cut_edge_list: A list of Cut objects. Each object has an
+        edge, a weight, and a subset attribute.
+    :type cut_edge_list: List[Cut]
+
+    :returns: A random Cut from the set of possible Cuts with the highest
+        surcharge.
+    :rtype: Cut
+    """
+    if (
+        not isinstance(region_surcharge, dict)
+        or not isinstance(cut_edge_list[0], Cut)
+        or cut_edge_list[0].weight is None
+    ):
+        return random.choice(cut_edge_list)
+
+    # Early return for simple cases
+    if len(region_surcharge) < 1 or len(region_surcharge) > 3:
+        return _max_weight_choice(cut_edge_list)
+
+    # Prepare data for efficient access
+    edge_region_info = {
+        cut: {
+            key: (
+                populated_graph.graph.nodes[cut.edge[0]].get(key),
+                populated_graph.graph.nodes[cut.edge[1]].get(key),
+            )
+            for key in region_surcharge
+        }
+        for cut in cut_edge_list
+    }
+
+    # Generate power set sorted by surcharge, then filter cuts based
+    # on region matching
+    power_set = _power_set_sorted_by_size_then_sum(region_surcharge)
+    for region_combination in power_set:
+        suitable_cuts = [
+            cut
+            for cut in cut_edge_list
+            if all(
+                edge_region_info[cut][key][0] != edge_region_info[cut][key][1]
+                for key in region_combination
+            )
+        ]
+        if suitable_cuts:
+            return _max_weight_choice(suitable_cuts)
+
+    return _max_weight_choice(cut_edge_list)
+
+"""------------------------------------------------------------------------------------------------------------------------"""
+
+
+
+
+
+
+
+
+"""  ------------------------------ Initial Solution Functions ------------------------------  """
+
+def uniform_spanning_tree(graph: nx.Graph) -> nx.Graph:
+    """
+    Builds a spanning tree chosen uniformly from the space of all
+    spanning trees of the graph. Uses Wilson's algorithm.
+
+    :param graph: Networkx Graph
+    :type graph: nx.Graph
+    :param choice: :func:`random.choice`. Defaults to :func:`random.choice`.
+    :type choice: Callable, optional
+
+    :returns: A spanning tree of the graph chosen uniformly at random.
+    :rtype: nx.Graph
+    """
+    root = random.choice(list(graph.node_indices))
+    tree_nodes = set([root])
+    next_node = {root: None}
+
+    for node in graph.node_indices:
+        u = node
+        while u not in tree_nodes:
+            next_node[u] = random.choice(list(graph.neighbors(u)))
+            u = next_node[u]
+
+        u = node
+        while u not in tree_nodes:
+            tree_nodes.add(u)
+            u = next_node[u]
+
+    G = nx.Graph()
+    G.add_nodes_from(graph.nodes(data=True))
+    
+    for node in tree_nodes:
+        if next_node[node] is not None:
+            G.add_edge(node, next_node[node])
+
+    return G
 
 
 def find_balanced_edge_cuts_contraction(
@@ -412,170 +585,18 @@ def find_balanced_edge_cuts_memoization(
         if (abs(tree_pop - h.ideal_pop) <= h.ideal_pop * h.epsilon) and (
             abs((total_pop - tree_pop) - h.ideal_pop) <= h.ideal_pop * h.epsilon
         ):
-            e = (node, pred[node])
-            wt = random.random()
-            cuts.append(
-                Cut(
-                    edge=e,
-                    weight=h.graph.edges[e].get("random_weight", wt),
-                    subset=frozenset(set(h.graph.nodes) - _part_nodes(node, succ)),
+            part_nodes = _part_nodes(node, succ)
+            if any(h.graph.nodes[node]['real_phc']==True for node in part_nodes):  # checks if there is a center in part_nodes
+                e = (node, pred[node])
+                wt = random.random()
+                cuts.append(
+                    Cut(
+                        edge=e,
+                        weight=h.graph.edges[e].get("random_weight", wt),
+                        subset=frozenset(set(h.graph.nodes) - part_nodes),
+                    )
                 )
-            )
     return cuts
-
-
-class BipartitionWarning(UserWarning):
-    """
-    Generally raised when it is proving difficult to find a balanced cut.
-    """
-
-    pass
-
-
-class ReselectException(Exception):
-    """
-    Raised when the tree-splitting algorithm is unable to find a
-    balanced cut after some maximum number of attempts, but the
-    user has allowed the algorithm to reselect the pair of
-    districts from parent graph to try and recombine.
-    """
-
-    pass
-
-
-def _max_weight_choice(cut_edge_list: List[Cut]) -> Cut:
-    """
-    Each Cut object in the list is assigned a random weight.
-    This random weight is either assigned during the call to
-    the minimum spanning tree algorithm (Kruskal's) algorithm
-    or it is generated during the selection of the balanced edges
-    (cf. :meth:`find_balanced_edge_cuts_memoization` and
-    :meth:`find_balanced_edge_cuts_contraction`).
-    This function returns the cut with the highest weight.
-
-    In the case where a region aware chain is run, this will
-    preferentially select for cuts that span different regions, rather
-    than cuts that are interior to that region (the likelihood of this
-    is generally controlled by the ``region_surcharge`` parameter).
-
-    In any case where the surcharges are either not set or zero,
-    this is effectively the same as calling random.choice() on the
-    list of cuts. Under the above conditions, all of the weights
-    on the cuts are randomly generated on the interval [0,1], and
-    there is no outside force that might make the weight assigned
-    to a particular type of cut higher than another.
-
-    :param cut_edge_list: A list of Cut objects. Each object has an
-        edge, a weight, and a subset attribute.
-    :type cut_edge_list: List[Cut]
-
-    :returns: The cut with the highest random weight.
-    :rtype: Cut
-    """
-
-    # Just in case, default to random choice
-    if not isinstance(cut_edge_list[0], Cut) or cut_edge_list[0].weight is None:
-        return random.choice(cut_edge_list)
-
-    return max(cut_edge_list, key=lambda cut: cut.weight)
-
-
-def _power_set_sorted_by_size_then_sum(d):
-    power_set = [
-        s for i in range(1, len(d) + 1) for s in itertools.combinations(d.keys(), i)
-    ]
-
-    # Sort the subsets in descending order based on
-    # the sum of their corresponding values in the dictionary
-    sorted_power_set = sorted(
-        power_set, key=lambda s: (len(s), sum(d[i] for i in s)), reverse=True
-    )
-
-    return sorted_power_set
-
-
-# Note that the populated graph and the region surcharge are passed
-# by object reference. This means that a copy is not made since we
-# are not modifying the object in the function, and the speed of
-# this randomized selection will not suffer for it.
-def _region_preferred_max_weight_choice(
-    populated_graph: PopulatedGraph, region_surcharge: Dict, cut_edge_list: List[Cut]
-) -> Cut:
-    """
-    This function is used in the case of a region-aware chain. It
-    is similar to the as :meth:`_max_weight_choice` function except
-    that it will preferentially select one of the cuts that has the
-    highest surcharge. So, if we have a weight dict of the form
-    ``{region1: wt1, region2: wt2}`` , then this function first looks
-    for a cut that is a cut edge for both ``region1`` and ``region2``
-    and then selects the one with the highest weight. If no such cut
-    exists, then it will then look for a cut that is a cut edge for the
-    region with the highest surcharge (presumably the region that we care
-    more about not splitting).
-
-    In the case of 3 regions, it will first look for a cut that is a
-    cut edge for all 3 regions, then for a cut that is a cut edge for
-    2 regions sorted by the highest total surcharge, and then for a cut
-    that is a cut edge for the region with the highest surcharge.
-
-    For the case of 4 or more regions, the power set starts to get a bit
-    large, so we default back to the :meth:`_max_weight_choice` function
-    and just select the cut with the highest weight, which will still
-    preferentially select for cuts that span the most regions that we
-    care about.
-
-    :param populated_graph: The populated graph.
-    :type populated_graph: PopulatedGraph
-    :param region_surcharge: A dictionary of surcharges for the spanning
-        tree algorithm.
-    :type region_surcharge: Dict
-    :param cut_edge_list: A list of Cut objects. Each object has an
-        edge, a weight, and a subset attribute.
-    :type cut_edge_list: List[Cut]
-
-    :returns: A random Cut from the set of possible Cuts with the highest
-        surcharge.
-    :rtype: Cut
-    """
-    if (
-        not isinstance(region_surcharge, dict)
-        or not isinstance(cut_edge_list[0], Cut)
-        or cut_edge_list[0].weight is None
-    ):
-        return random.choice(cut_edge_list)
-
-    # Early return for simple cases
-    if len(region_surcharge) < 1 or len(region_surcharge) > 3:
-        return _max_weight_choice(cut_edge_list)
-
-    # Prepare data for efficient access
-    edge_region_info = {
-        cut: {
-            key: (
-                populated_graph.graph.nodes[cut.edge[0]].get(key),
-                populated_graph.graph.nodes[cut.edge[1]].get(key),
-            )
-            for key in region_surcharge
-        }
-        for cut in cut_edge_list
-    }
-
-    # Generate power set sorted by surcharge, then filter cuts based
-    # on region matching
-    power_set = _power_set_sorted_by_size_then_sum(region_surcharge)
-    for region_combination in power_set:
-        suitable_cuts = [
-            cut
-            for cut in cut_edge_list
-            if all(
-                edge_region_info[cut][key][0] != edge_region_info[cut][key][1]
-                for key in region_combination
-            )
-        ]
-        if suitable_cuts:
-            return _max_weight_choice(suitable_cuts)
-
-    return _max_weight_choice(cut_edge_list)
 
 
 def bipartition_tree(
@@ -678,9 +699,9 @@ def bipartition_tree(
 
     while max_attempts is None or attempts < max_attempts:
         if restarts == node_repeats:
-            spanning_tree = spanning_tree_fn(graph)
+            spanning_tree = spanning_tree_fn(graph)  # does this make sense for the initial solution?
             restarts = 0
-        h = PopulatedGraph(spanning_tree, populations, pop_target, epsilon)
+        h = PopulatedGraph(spanning_tree, populations, pop_target, epsilon) # does this preserve graph attributes? Center locations?
 
         is_region_cut = (
             "region_surcharge" in signature(cut_choice).parameters
@@ -716,6 +737,136 @@ def bipartition_tree(
         )
 
     raise RuntimeError(f"Could not find a possible cut after {max_attempts} attempts.")
+
+
+def recursive_tree_part(
+    graph: nx.Graph,
+    parts: Sequence,
+    pop_target: Union[float, int],
+    pop_col: str,
+    epsilon: float,
+    node_repeats: int = 1,
+    method: Callable = partial(bipartition_tree, max_attempts=10000),
+) -> Dict:
+    """
+    Uses :func:`~gerrychain.tree.bipartition_tree` recursively to partition a tree into
+    ``len(parts)`` parts of population ``pop_target`` (within ``epsilon``). Can be used to
+    generate initial seed plans or to implement ReCom-like "merge walk" proposals.
+
+    :param graph: The graph to partition into ``len(parts)`` :math:`\varepsilon`-balanced parts.
+    :type graph: nx.Graph
+    :param parts: Iterable of part (district) labels (like ``[0,1,2]`` or ``range(4)``).
+    :type parts: Sequence
+    :param pop_target: Target population for each part of the partition.
+    :type pop_target: Union[float, int]
+    :param pop_col: Node attribute key holding population data.
+    :type pop_col: str
+    :param epsilon: How far (as a percentage of ``pop_target``) from ``pop_target`` the parts
+        of the partition can be.
+    :type epsilon: float
+    :param node_repeats: Parameter for :func:`~gerrychain.tree_methods.bipartition_tree` to use.
+        Defaluts to 1.
+    :type node_repeats: int, optional
+    :param method: The partition method to use. Defaults to
+        `partial(bipartition_tree, max_attempts=10000)`.
+    :type method: Callable, optional
+
+    :returns: New assignments for the nodes of ``graph``.
+    :rtype: dict
+    """
+    flips = {}
+    remaining_nodes = graph.node_indices
+    # We keep a running tally of deviation from ``epsilon`` at each partition
+    # and use it to tighten the population constraints on a per-partition
+    # basis such that every partition, including the last partition, has a
+    # population within +/-``epsilon`` of the target population.
+    # For instance, if district n's population exceeds the target by 2%
+    # with a +/-2% epsilon, then district n+1's population should be between
+    # 98% of the target population and the target population.
+    debt: Union[int, float] = 0
+
+    lb_pop = pop_target * (1 - epsilon)
+    ub_pop = pop_target * (1 + epsilon)
+    check_pop = lambda x: lb_pop <= x <= ub_pop
+
+    for part in parts[:-2]:
+        min_pop = max(pop_target * (1 - epsilon), pop_target * (1 - epsilon) - debt)
+        max_pop = min(pop_target * (1 + epsilon), pop_target * (1 + epsilon) - debt)
+        new_pop_target = (min_pop + max_pop) / 2
+
+        try:
+            nodes = method(
+                graph.subgraph(remaining_nodes),
+                pop_col=pop_col,
+                pop_target=new_pop_target,
+                epsilon=(max_pop - min_pop) / (2 * new_pop_target),
+                node_repeats=node_repeats,
+                one_sided_cut=True,
+            )
+        except Exception:
+            raise
+
+        if nodes is None:
+            raise BalanceError()
+
+        part_pop = 0
+        for node in nodes:
+            flips[node] = part
+            part_pop += graph.nodes[node][pop_col]
+
+        if not check_pop(part_pop):
+            raise PopulationBalanceError()
+
+        debt += part_pop - pop_target
+        remaining_nodes -= nodes
+
+    # After making n-2 districts, we need to make sure that the last
+    # two districts are both balanced.
+    nodes = method(
+        graph.subgraph(remaining_nodes),
+        pop_col=pop_col,
+        pop_target=pop_target,
+        epsilon=epsilon,
+        node_repeats=node_repeats,
+        one_sided_cut=False,
+    )
+
+    if nodes is None:
+        raise BalanceError()
+
+    part_pop = 0
+    for node in nodes:
+        flips[node] = parts[-2]
+        part_pop += graph.nodes[node][pop_col]
+
+    if not check_pop(part_pop):
+        raise PopulationBalanceError()
+
+    remaining_nodes -= nodes
+
+    # All of the remaining nodes go in the last part
+    part_pop = 0
+    for node in remaining_nodes:
+        flips[node] = parts[-1]
+        part_pop += graph.nodes[node][pop_col]
+
+    if not check_pop(part_pop):
+        raise PopulationBalanceError()
+
+    return flips
+
+
+"""------------------------------------------------------------------------------------------------------------------------ """
+
+
+
+
+
+
+
+"""  ------------------------------ ReCom Functions ------------------------------  """
+
+
 
 
 def _bipartition_tree_random_all(
@@ -965,482 +1116,4 @@ def epsilon_tree_bipartition(
 
     return flips
 
-
-# TODO: Move these recursive partition functions to their own module. They are not
-# central to the operation of the recom function despite being tree methods.
-def recursive_tree_part(
-    graph: nx.Graph,
-    parts: Sequence,
-    pop_target: Union[float, int],
-    pop_col: str,
-    epsilon: float,
-    node_repeats: int = 1,
-    method: Callable = partial(bipartition_tree, max_attempts=10000),
-) -> Dict:
-    """
-    Uses :func:`~gerrychain.tree.bipartition_tree` recursively to partition a tree into
-    ``len(parts)`` parts of population ``pop_target`` (within ``epsilon``). Can be used to
-    generate initial seed plans or to implement ReCom-like "merge walk" proposals.
-
-    :param graph: The graph to partition into ``len(parts)`` :math:`\varepsilon`-balanced parts.
-    :type graph: nx.Graph
-    :param parts: Iterable of part (district) labels (like ``[0,1,2]`` or ``range(4)``).
-    :type parts: Sequence
-    :param pop_target: Target population for each part of the partition.
-    :type pop_target: Union[float, int]
-    :param pop_col: Node attribute key holding population data.
-    :type pop_col: str
-    :param epsilon: How far (as a percentage of ``pop_target``) from ``pop_target`` the parts
-        of the partition can be.
-    :type epsilon: float
-    :param node_repeats: Parameter for :func:`~gerrychain.tree_methods.bipartition_tree` to use.
-        Defaluts to 1.
-    :type node_repeats: int, optional
-    :param method: The partition method to use. Defaults to
-        `partial(bipartition_tree, max_attempts=10000)`.
-    :type method: Callable, optional
-
-    :returns: New assignments for the nodes of ``graph``.
-    :rtype: dict
-    """
-    flips = {}
-    remaining_nodes = graph.node_indices
-    # We keep a running tally of deviation from ``epsilon`` at each partition
-    # and use it to tighten the population constraints on a per-partition
-    # basis such that every partition, including the last partition, has a
-    # population within +/-``epsilon`` of the target population.
-    # For instance, if district n's population exceeds the target by 2%
-    # with a +/-2% epsilon, then district n+1's population should be between
-    # 98% of the target population and the target population.
-    debt: Union[int, float] = 0
-
-    lb_pop = pop_target * (1 - epsilon)
-    ub_pop = pop_target * (1 + epsilon)
-    check_pop = lambda x: lb_pop <= x <= ub_pop
-
-    for part in parts[:-2]:
-        min_pop = max(pop_target * (1 - epsilon), pop_target * (1 - epsilon) - debt)
-        max_pop = min(pop_target * (1 + epsilon), pop_target * (1 + epsilon) - debt)
-        new_pop_target = (min_pop + max_pop) / 2
-
-        try:
-            nodes = method(
-                graph.subgraph(remaining_nodes),
-                pop_col=pop_col,
-                pop_target=new_pop_target,
-                epsilon=(max_pop - min_pop) / (2 * new_pop_target),
-                node_repeats=node_repeats,
-                one_sided_cut=True,
-            )
-        except Exception:
-            raise
-
-        if nodes is None:
-            raise BalanceError()
-
-        part_pop = 0
-        for node in nodes:
-            flips[node] = part
-            part_pop += graph.nodes[node][pop_col]
-
-        if not check_pop(part_pop):
-            raise PopulationBalanceError()
-
-        debt += part_pop - pop_target
-        remaining_nodes -= nodes
-
-    # After making n-2 districts, we need to make sure that the last
-    # two districts are both balanced.
-    nodes = method(
-        graph.subgraph(remaining_nodes),
-        pop_col=pop_col,
-        pop_target=pop_target,
-        epsilon=epsilon,
-        node_repeats=node_repeats,
-        one_sided_cut=False,
-    )
-
-    if nodes is None:
-        raise BalanceError()
-
-    part_pop = 0
-    for node in nodes:
-        flips[node] = parts[-2]
-        part_pop += graph.nodes[node][pop_col]
-
-    if not check_pop(part_pop):
-        raise PopulationBalanceError()
-
-    remaining_nodes -= nodes
-
-    # All of the remaining nodes go in the last part
-    part_pop = 0
-    for node in remaining_nodes:
-        flips[node] = parts[-1]
-        part_pop += graph.nodes[node][pop_col]
-
-    if not check_pop(part_pop):
-        raise PopulationBalanceError()
-
-    return flips
-
-
-def get_seed_chunks(
-    graph: nx.Graph,
-    num_chunks: int,
-    num_dists: int,
-    pop_target: Union[int, float],
-    pop_col: str,
-    epsilon: float,
-    node_repeats: int = 1,
-    method: Callable = partial(bipartition_tree_random, max_attempts=10000),
-) -> List[List[int]]:
-    """
-    Helper function for recursive_seed_part. Partitions the graph into ``num_chunks`` chunks,
-    balanced within new_epsilon <= ``epsilon`` of a balanced target population.
-
-    :param graph: The graph
-    :type graph: nx.Graph
-    :param num_chunks: The number of chunks to partition the graph into
-    :type num_chunks: int
-    :param num_dists: The number of districts
-    :type num_dists: int
-    :param pop_target: The target population of the districts (not of the chunks)
-    :type pop_target: Union[int, float]
-    :param pop_col: Node attribute key holding population data
-    :type pop_col: str
-    :param epsilon: How far (as a percentage of ``pop_target``) from ``pop_target`` the parts
-        of the partition can be
-    :type epsilon: float
-    :param node_repeats: Parameter for :func:`~gerrychain.tree_methods.bipartition_tree_random`
-        to use. Defaults to 1.
-    :type node_repeats: int, optional
-    :param method: The method to use for bipartitioning the graph.
-        Defaults to :func:`~gerrychain.tree_methods.bipartition_tree_random`
-    :type method: Callable, optional
-
-    :returns: New assignments for the nodes of ``graph``.
-    :rtype: List[List[int]]
-    """
-    num_chunks_left = num_dists // num_chunks
-    parts = range(num_chunks)
-    new_epsilon = epsilon / (num_chunks_left * num_chunks)
-    if num_chunks_left == 1:
-        new_epsilon = epsilon
-
-    chunk_pop = 0
-    for node in graph.node_indices:
-        chunk_pop += graph.nodes[node][pop_col]
-
-    while True:
-        epsilon = abs(epsilon)
-
-        flips = {}
-        remaining_nodes = set(graph.nodes)
-
-        min_pop = pop_target * (1 - new_epsilon) * num_chunks_left
-        max_pop = pop_target * (1 + new_epsilon) * num_chunks_left
-
-        chunk_pop_target = chunk_pop / num_chunks
-
-        diff = min(max_pop - chunk_pop_target, chunk_pop_target - min_pop)
-        new_new_epsilon = diff / chunk_pop_target
-
-        for i in range(len(parts[:-1])):
-            part = parts[i]
-
-            nodes = method(
-                graph.subgraph(remaining_nodes),
-                pop_col=pop_col,
-                pop_target=chunk_pop_target,
-                epsilon=new_new_epsilon,
-                node_repeats=node_repeats,
-            )
-
-            if nodes is None:
-                raise BalanceError()
-
-            for node in nodes:
-                flips[node] = part
-            remaining_nodes -= nodes
-
-            # All of the remaining nodes go in the last part
-            for node in remaining_nodes:
-                flips[node] = parts[-1]
-
-        part_pop = 0
-        for node in remaining_nodes:
-            part_pop += graph.nodes[node][pop_col]
-        part_pop_as_dist = part_pop / num_chunks_left
-        fake_epsilon = epsilon
-        if num_chunks_left != 1:
-            fake_epsilon = epsilon / 2
-        min_pop_as_dist = pop_target * (1 - fake_epsilon)
-        max_pop_as_dist = pop_target * (1 + fake_epsilon)
-
-        if part_pop_as_dist < min_pop_as_dist:
-            new_epsilon = new_epsilon / 2
-        elif part_pop_as_dist > max_pop_as_dist:
-            new_epsilon = new_epsilon / 2
-        else:
-            break
-
-    chunks: Dict[Any, List] = {}
-    for key in flips.keys():
-        if flips[key] not in chunks.keys():
-            chunks[flips[key]] = []
-        chunks[flips[key]].append(key)
-
-    return list(chunks.values())
-
-
-def get_max_prime_factor_less_than(n: int, ceil: int) -> Optional[int]:
-    """
-    Helper function for recursive_seed_part_inner. Returns the largest prime factor of ``n``
-    less than ``ceil``, or None if all are greater than ceil.
-
-    :param n: The number to find the largest prime factor for.
-    :type n: int
-    :param ceil: The upper limit for the largest prime factor.
-    :type ceil: int
-
-    :returns: The largest prime factor of ``n`` less than ``ceil``, or None if all are greater
-        than ceil.
-    :rtype: Optional[int]
-    """
-    if n <= 1 or ceil <= 1:
-        return None
-
-    largest_factor = None
-    while n % 2 == 0:
-        largest_factor = 2
-        n //= 2
-
-    i = 3
-    while i * i <= n:
-        while n % i == 0:
-            if i <= ceil:
-                largest_factor = i
-            n //= i
-        i += 2
-
-    if n > 1 and n <= ceil:
-        largest_factor = n
-
-    return largest_factor
-
-
-def recursive_seed_part_inner(
-    graph: nx.Graph,
-    num_dists: int,
-    pop_target: Union[float, int],
-    pop_col: str,
-    epsilon: float,
-    method: Callable = partial(bipartition_tree, max_attempts=10000),
-    node_repeats: int = 1,
-    n: Optional[int] = None,
-    ceil: Optional[int] = None,
-) -> List[Set]:
-    """
-    Inner function for recursive_seed_part.
-    Returns a partition with ``num_dists`` districts balanced within ``epsilon`` of
-    ``pop_target``.
-    Splits graph into num_chunks chunks, and then recursively splits each chunk into
-    ``num_dists``/num_chunks chunks.
-    The number num_chunks of chunks is chosen based on ``n`` and ``ceil`` as follows:
-
-    - If ``n`` is None, and ``ceil`` is None, num_chunks is the largest prime factor
-      of ``num_dists``.
-    - If ``n`` is None and ``ceil`` is an integer at least 2, then num_chunks is the
-      largest prime factor of ``num_dists`` that is less than ``ceil``
-    - If ``n`` is a positive integer, num_chunks equals n.
-
-    Finally, if the number of chunks as chosen above does not divide ``num_dists``, then
-    this function bites off a single district from the graph and recursively partitions
-    the remaining graph into ``num_dists - 1`` districts.
-
-    :param graph: The underlying graph structure.
-    :type graph: nx.Graph
-    :param num_dists: number of districts to partition the graph into
-    :type num_dists: int
-    :param pop_target: Target population for each part of the partition
-    :type pop_target: Union[float, int]
-    :param pop_col: Node attribute key holding population data
-    :type pop_col: str
-    :param epsilon: How far (as a percentage of ``pop_target``) from ``pop_target`` the parts
-        of the partition can be
-    :type epsilon: float
-    :param method: Function used to find balanced partitions at the 2-district level.
-        Defaults to :func:`~gerrychain.tree_methods.bipartition_tree`
-    :type method: Callable, optional
-    :param node_repeats: Parameter for :func:`~gerrychain.tree_methods.bipartition_tree` to use.
-        Defaults to 1.
-    :type node_repeats: int, optional
-    :param n: Either a positive integer (greater than 1) or None. If n is a positive integer,
-        this function will recursively create a seed plan by either biting off districts from
-        graph or dividing graph into n chunks and recursing into each of these. If n is None,
-        this function prime factors ``num_dists``=n_1*n_2*...*n_k (n_1 > n_2 > ... n_k) and
-        recursively partitions graph into n_1 chunks. Defaults to None.
-    :type n: Optional[int], optional
-    :param ceil: Either a positive integer (at least 2) or None. Relevant only if n is None.
-        If ``ceil`` is a positive integer then finds the largest factor of ``num_dists`` less
-        than or equal to ``ceil``, and recursively splits graph into that number of chunks, or
-        bites off a district if that number is 1. Defaults to None.
-    :type ceil: Optional[int], optional
-
-    :returns: New assignments for the nodes of ``graph``.
-    :rtype: List of sets, each set is a district
-    """
-
-    # Chooses num_chunks
-    if n is None:
-        if ceil is None:
-            num_chunks = get_max_prime_factor_less_than(num_dists, num_dists)
-        elif ceil >= 2:
-            num_chunks = get_max_prime_factor_less_than(num_dists, ceil)
-        else:
-            raise ValueError("ceil must be None or at least 2")
-    elif n > 1:
-        num_chunks = n
-    else:
-        raise ValueError("n must be None or a positive integer")
-
-    # base case
-    if num_dists == 1:
-        return [set(graph.nodes)]
-
-    if num_dists == 2:
-        nodes = method(
-            graph,
-            pop_col=pop_col,
-            pop_target=pop_target,
-            epsilon=epsilon,
-            node_repeats=node_repeats,
-            one_sided_cut=False,
-        )
-
-        return [set(nodes), set(graph.nodes) - set(nodes)]
-
-    # bite off a district and recurse into the remaining subgraph
-    elif num_chunks is None or num_dists % num_chunks != 0:
-        remaining_nodes = set(graph.nodes)
-        nodes = method(
-            graph.subgraph(remaining_nodes),
-            pop_col=pop_col,
-            pop_target=pop_target,
-            epsilon=epsilon,
-            node_repeats=node_repeats,
-            one_sided_cut=True,
-        )
-        remaining_nodes -= nodes
-        assignment = [nodes] + recursive_seed_part_inner(
-            graph.subgraph(remaining_nodes),
-            num_dists - 1,
-            pop_target,
-            pop_col,
-            epsilon,
-            method,
-            n=n,
-            ceil=ceil,
-        )
-
-    # split graph into num_chunks chunks, and recurse into each chunk
-    elif num_dists % num_chunks == 0:
-        chunks = get_seed_chunks(
-            graph,
-            num_chunks,
-            num_dists,
-            pop_target,
-            pop_col,
-            epsilon,
-            method=partial(method, one_sided_cut=True),
-        )
-
-        assignment = []
-        for chunk in chunks:
-            chunk_assignment = recursive_seed_part_inner(
-                graph.subgraph(chunk),
-                num_dists // num_chunks,
-                pop_target,
-                pop_col,
-                epsilon,
-                method,
-                n=n,
-                ceil=ceil,
-            )
-            assignment += chunk_assignment
-
-    return assignment
-
-
-def recursive_seed_part(
-    graph: nx.Graph,
-    parts: Sequence,
-    pop_target: Union[float, int],
-    pop_col: str,
-    epsilon: float,
-    method: Callable = partial(bipartition_tree, max_attempts=10000),
-    node_repeats: int = 1,
-    n: Optional[int] = None,
-    ceil: Optional[int] = None,
-) -> Dict:
-    """
-    Returns a partition with ``num_dists`` districts balanced within ``epsilon`` of
-    ``pop_target`` by recursively splitting graph using recursive_seed_part_inner.
-
-    :param graph: The graph
-    :type graph: nx.Graph
-    :param parts: Iterable of part labels (like ``[0,1,2]`` or ``range(4)``
-    :type parts: Sequence
-    :param pop_target: Target population for each part of the partition
-    :type pop_target: Union[float, int]
-    :param pop_col: Node attribute key holding population data
-    :type pop_col: str
-    :param epsilon: How far (as a percentage of ``pop_target``) from ``pop_target`` the parts
-        of the partition can be
-    :type epsilon: float
-    :param method: Function used to find balanced partitions at the 2-district level
-        Defaults to :func:`~gerrychain.tree_methods.bipartition_tree`
-    :type method: Callable, optional
-    :param node_repeats: Parameter for :func:`~gerrychain.tree_methods.bipartition_tree` to use.
-        Defaults to 1.
-    :type node_repeats: int, optional
-    :param n: Either a positive integer (greater than 1) or None. If n is a positive integer,
-        this function will recursively create a seed plan by either biting off districts from graph
-        or dividing graph into n chunks and recursing into each of these. If n is None, this
-        function prime factors ``num_dists``=n_1*n_2*...*n_k (n_1 > n_2 > ... n_k) and recursively
-        partitions graph into n_1 chunks. Defaults to None.
-    :type n: Optional[int], optional
-    :param ceil: Either a positive integer (at least 2) or None. Relevant only if n is None. If
-        ``ceil`` is a positive integer then finds the largest factor of ``num_dists`` less than or
-        equal to ``ceil``, and recursively splits graph into that number of chunks, or bites off a
-        district if that number is 1. Defaults to None.
-    :type ceil: Optional[int], optional
-
-    :returns: New assignments for the nodes of ``graph``.
-    :rtype: dict
-    """
-    flips = {}
-    assignment = recursive_seed_part_inner(
-        graph,
-        len(parts),
-        pop_target,
-        pop_col,
-        epsilon,
-        method=method,
-        node_repeats=node_repeats,
-        n=n,
-        ceil=ceil,
-    )
-    for i in range(len(assignment)):
-        for node in assignment[i]:
-            flips[node] = parts[i]
-    return flips
-
-
-class BalanceError(Exception):
-    """Raised when a balanced cut cannot be found."""
-
-
-class PopulationBalanceError(Exception):
-    """Raised when the population of a district is outside the acceptable epsilon range."""
+"""------------------------------------------------------------------------------------------------------------------------ """

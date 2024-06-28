@@ -12,7 +12,7 @@ Last Updated: 11 Jan 2024
 """
 
 from itertools import product
-from .constraints import Validator
+from gerrychain.constraints import Validator
 from typing import Callable, Dict, Iterator, Iterable, Union
 from gerrychain.partition import Partition
 

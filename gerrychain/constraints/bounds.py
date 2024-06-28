@@ -1,5 +1,5 @@
 from typing import Callable, Tuple
-from ..partition import Partition
+from partition import Partition
 
 
 class Bounds:

@@ -364,7 +364,7 @@ def recursive_partition(
     total_pop: int,
     epsilon: float,
     max_attempts: int,
-) -> Dict:
+    ) -> Dict:
     """
     Uses `find_balanced_district` to partition a tree recursively into ``len(centers)`` components of 
     population ``pop_target`` (within ``epsilon``) around centers. Used to generate initial redistricting plan.
@@ -409,14 +409,7 @@ def recursive_partition(
         min_pop = max(pop_target * (1 - epsilon), pop_target * (1 - epsilon) - debt)
         max_pop = min(pop_target * (1 + epsilon), pop_target * (1 + epsilon) - debt)
         new_pop_target = (min_pop + max_pop) / 2
-
         epsilon=(max_pop - min_pop) / (2 * new_pop_target)
-
-        try:
-            subtree_nodes, subtree_pop = split_district(graph.subgraph(remaining_nodes), num_centers, 
-
-
-        #epsilon=(max_pop - min_pop) / (2 * new_pop_target)
 
         try:
             subtree_nodes, subtree_pop = split_district(graph.subgraph(remaining_nodes), num_cent, 
@@ -457,8 +450,8 @@ def recursive_partition(
                                                 total_pop, new_pop_target, epsilon, max_attempts)
 
 
-        print(f" Check_pop is valid. Debt in {i+1}.th iteration: {debt}.")
-        print("----------------------------------------------RECURSIVE PARTITION: Going to new iteration. ----------------------------------------------------")
+    print(f" Check_pop is valid. Debt in {i+1}.th iteration: {debt}.")
+    print("----------------------------------------------RECURSIVE PARTITION: Going to new iteration. ----------------------------------------------------")
     # After making n-2 districts, we need to make sure that the last two districts are both balanced.
     subtree_nodes, subtree_pop = split_district(graph.subgraph(remaining_nodes), num_centers, 
                                                 total_pop, new_pop_target, epsilon, max_attempts)

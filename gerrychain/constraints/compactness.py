@@ -1,4 +1,4 @@
-from ..partition import Partition
+from partition import Partition
 import math
 
 

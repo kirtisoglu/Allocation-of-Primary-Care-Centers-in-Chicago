@@ -1,11 +1,12 @@
 import json
 import networkx
 
-from gerrychain.graph.graph import FrozenGraph, Graph
-from ..updaters import compute_edge_flows, flows_from_changes, cut_edges
+
+from updaters import compute_edge_flows, flows_from_changes, cut_edges
 from .assignment import get_assignment
 from .subgraphs import SubgraphView
-from ..tree import recursive_tree_part
+from xx_graph import *
+from tree import recursive_tree_part
 from typing import Any, Callable, Dict, Optional, Tuple
 
 

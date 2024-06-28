@@ -3,7 +3,7 @@ from inspect import signature
 import random
 
 from gerrychain.partition import Partition
-from ..tree import (
+from tree import (
     epsilon_tree_bipartition,
     bipartition_tree,
     bipartition_tree_random,

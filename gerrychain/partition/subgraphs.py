@@ -1,5 +1,5 @@
 from typing import List, Any, Tuple
-from ..graph import Graph
+from xx_graph import Graph
 
 
 class SubgraphView:

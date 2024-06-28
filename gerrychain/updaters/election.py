@@ -1,7 +1,7 @@
 import math
 from typing import Dict, List, Optional, Tuple, Union
-from gerrychain.updaters.tally import DataTally
-import gerrychain.metrics.partisan as pm
+from updaters.tally import DataTally
+
 
 
 class Election:

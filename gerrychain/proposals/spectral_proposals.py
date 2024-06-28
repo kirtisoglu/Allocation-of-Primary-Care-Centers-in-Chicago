@@ -1,8 +1,8 @@
 import networkx as nx
 from numpy import linalg as LA
 import random
-from ..graph import Graph
-from ..partition import Partition
+from xx_graph import Graph
+from partition import Partition
 from typing import Dict, Optional
 
 

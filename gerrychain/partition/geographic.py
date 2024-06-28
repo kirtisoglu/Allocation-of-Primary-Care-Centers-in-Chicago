@@ -1,5 +1,5 @@
-from gerrychain.partition import Partition
-from gerrychain.updaters import (
+from .partition import Partition
+from updaters import (
     Tally,
     boundary_nodes,
     cut_edges,

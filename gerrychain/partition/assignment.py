@@ -1,7 +1,7 @@
 from collections import defaultdict
 from collections.abc import Mapping
 from typing import Dict, Union, Optional, DefaultDict, Set, Type
-from ..graph import Graph
+from xx_graph import Graph
 
 import pandas
 

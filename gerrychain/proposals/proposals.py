@@ -1,8 +1,9 @@
+
+
+
 import random
 
-# from typing import TypeVar
-# Partition = TypeVar("Partition")
-from ..partition import Partition
+from partition import Partition
 
 
 def propose_any_node_flip(partition: Partition) -> Partition:

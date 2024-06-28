@@ -3,9 +3,20 @@ import warnings
 
 from ._version import get_versions
 from .chain import MarkovChain
-from .graph import Graph
-from .partition import GeographicPartition, Partition
-from .updaters.election import Election
+from .xx_graph import *
+from .partition.partition import Partition
+from .updaters import Election
+
+from .tree import (
+    epsilon_tree_bipartition,
+    bipartition_tree,
+    bipartition_tree_random,
+    _bipartition_tree_random_all,
+    uniform_spanning_tree,
+    find_balanced_edge_cuts_memoization,
+    ReselectException,
+)
+
 
 # Will need to change this to a logging option later
 # It might be good to see how often this happens

@@ -3,7 +3,7 @@ from itertools import count
 
 import networkx as nx
 from typing import Callable, Any, Dict, Set
-from ..partition import Partition
+from partition import Partition
 import random
 from .bounds import SelfConfiguringLowerBound
 
