@@ -3,8 +3,6 @@
 This project aims to optimize the allocation of primary care centers in Chicago using advanced data analysis and optimization techniques. We tested a flip-based local search and a recombination method using Markov chains. We utilize Chicago transportation data for calculating travel times between any two blocks in the city. We use a shortest-path algorithm to estimate the travel times between any pair of Census blocks. We also implemented a reinforcement learning algorithm to improve the result we obtained from the recombination method. Once I submit the research paper, I will clean the code and explain the components.  
 
 
-```markdown
-
 ## Prerequisites
 
 Before you begin, ensure you have Python installed on your system. This project is developed using
@@ -17,7 +15,7 @@ higher is recommended.
 Pipenv is used for managing project dependencies and virtual environments. Follow these steps to set up
 the project environment using Pipenv:
 
-```bash
+```markdown
 # Install Pipenv
 pip install pipenv
 
