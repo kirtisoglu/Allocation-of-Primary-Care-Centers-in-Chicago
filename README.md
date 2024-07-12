@@ -1,8 +1,8 @@
 ```markdown
 
-(The project is still under construction...)
+(A research paper is getting ready to submit to a journal. Once I complete the paper, I will clean the code and explain the components.)
 
-# Allocation of Primary Care Centers in Chicago Area 
+# Allocation of Primary Care Centers in the Chicago Area 
 
 This project aims to optimize the allocation of primary care centers in Chicago using advanced data analysis and optimization techniques.
 
