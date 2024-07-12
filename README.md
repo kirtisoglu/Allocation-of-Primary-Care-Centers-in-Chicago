@@ -5,10 +5,8 @@ This project aims to optimize the allocation of primary care centers in Chicago 
 
 ## Prerequisites
 
-Before you begin, ensure you have Python installed on your system. This project is developed using
-Python 3.12. While it is likely that earlier versions of Python 3 may also work, they have not been
-tested and thus cannot be guaranteed to be fully compatible. For best results, using Python 3.12 or
-higher is recommended.
+This project is developed using Python 3.12. While it is likely that earlier versions of Python 3 may also work, they have not been
+tested and thus cannot be guaranteed to be fully compatible. For best results, using Python 3.12 or higher is recommended.
 
 ## Installation
 
