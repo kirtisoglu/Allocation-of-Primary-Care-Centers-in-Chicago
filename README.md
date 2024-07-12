@@ -1,10 +1,6 @@
 # Allocation of Primary Care Centers in the Chicago Area 
 
-For the hierarchical facility location problem, we tested a flip-based local search and a recombination method using Markov chains. We utilize Chicago transportation data for
-calculating travel times between any two blocks in the city. We use a shortest-path algorithm
-to estimate the travel times between any pair of Census blocks. We also implemented a
-reinforcement learning algorithm to improve the result we obtained from the recombination
-method. Once I submit the research paper, I will clean the code and explain the components.)
+For the hierarchical facility location problem, we tested a flip-based local search and a recombination method using Markov chains. We utilize Chicago transportation data for calculating travel times between any two blocks in the city. We use a shortest-path algorithm to estimate the travel times between any pair of Census blocks. We also implemented a reinforcement learning algorithm to improve the result we obtained from the recombination method. Once I submit the research paper, I will clean the code and explain the components.
 
 
 ```markdown
