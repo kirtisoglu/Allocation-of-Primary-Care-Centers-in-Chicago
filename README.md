@@ -21,7 +21,7 @@ pip install pipenv
 git clone https://github.com/kirtisoglu/Allocation-of-Primary-Care-Centers-in-Chicago
 cd Allocation-of-Primary-Care-Centers-in-Chicago
 
-#Set Up the Environment
+# Set Up the Environment
 pipenv install
 
 # Activate the Virtual Environment
