@@ -74,9 +74,12 @@ class PopulatedGraph:
         graph: nx.Graph,
         populations: Dict,
         ideal_pop: Union[float, int],
+        average_pop: Union[float],
         epsilon: float,
+        n_teams: int,
+        hierarchy: int,
     ) -> None:
-        """
+        """ 
         :param graph: The underlying graph structure.
         :type graph: nx.Graph
         :param populations: A dictionary mapping nodes to their populations.
@@ -92,6 +95,9 @@ class PopulatedGraph:
         self.population = populations.copy()
         self.tot_pop = sum(self.population.values())
         self.ideal_pop = ideal_pop
+        #self.average_pop = average_pop
+        self.n_teams = n_teams
+        self.hierarchy = hierarchy
         self.epsilon = epsilon
         self._degrees = {node: graph.degree(node) for node in graph.nodes}
 
@@ -150,14 +156,13 @@ class PopulatedGraph:
         )
 
 # Tuple that is used in the find_balanced_edge_cuts function
-Cut = namedtuple("Cut", "edge weight subset")
+Cut = namedtuple("Cut", "edge weight subset assigned_teams")
 Cut.__new__.__defaults__ = (None, None, None)
 Cut.__doc__ = "Represents a cut in a graph."
 Cut.edge.__doc__ = "The edge where the cut is made. Defaults to None."
 Cut.weight.__doc__ = "The weight assigned to the edge (if any). Defaults to None."
-Cut.subset.__doc__ = (
-    "The (frozen) subset of nodes on one side of the cut. Defaults to None."
-)
+Cut.subset.__doc__ = ("The (frozen) subset of nodes on one side of the cut. Defaults to None.")
+Cut.assigned_teams.__doc__ = "The number of doctor-nurse teams for the subtree beneath the cut edge."
 
 class BipartitionWarning(UserWarning):
     """
@@ -461,7 +466,7 @@ def find_balanced_edge_cuts_contraction(
 
 def _calc_pops(succ, root, h):
     """
-    Calculates the population of each subtree in the graph
+    Calculates the population and area of each subtree in the graph
     by traversing the graph using a depth-first search.
 
     :param succ: The successors of the graph.
@@ -475,15 +480,16 @@ def _calc_pops(succ, root, h):
     :rtype: Dict
     """
     subtree_pops: Dict[Any, Union[int, float]] = {}
+    
     stack = deque(n for n in succ[root])
     while stack:
-        next_node = stack.pop()
+        next_node = stack.pop() 
         if next_node not in subtree_pops:
             if next_node in succ:
                 children = succ[next_node]
                 if all(c in subtree_pops for c in children):
-                    subtree_pops[next_node] = sum(subtree_pops[c] for c in children)
-                    subtree_pops[next_node] += h.population[next_node]
+                    subtree_pops[next_node] = sum(subtree_pops[c] for c in children) + h.population[next_node]
+                    
                 else:
                     stack.append(next_node)
                     for c in children:
@@ -492,7 +498,7 @@ def _calc_pops(succ, root, h):
             else:
                 subtree_pops[next_node] = h.population[next_node]
 
-    return subtree_pops
+    return subtree_pops 
 
 
 def _part_nodes(start, succ):
@@ -518,11 +524,13 @@ def _part_nodes(start, succ):
                 for c in succ[next_node]:
                     if c not in nodes:
                         queue.append(c)
+    
     return nodes
+ 
 
 
 def find_balanced_edge_cuts_memoization(
-    h: PopulatedGraph, one_sided_cut: bool = False, choice: Callable = random.choice
+    h: PopulatedGraph, one_sided_cut: bool = False, add_root: bool = False, choice: Callable = random.choice,
 ) -> List[Cut]:
     """
     Find balanced edge cuts using memoization.
@@ -540,6 +548,8 @@ def find_balanced_edge_cuts_memoization(
         check if the node we are cutting is within epsilon of the ideal population.
         Defaults to False.
     :type one_sided_cut: bool, optional
+    :param add_root: If set to True, an artifical node is connected to root, and the edge between them is considered as a possible cut.
+    :type add_root: bool, optional
     :param choice: The choice function used to select the root node.
     :type choice: Callable, optional
 
@@ -552,50 +562,79 @@ def find_balanced_edge_cuts_memoization(
     succ = successors(h.graph, root)
     total_pop = h.tot_pop
 
-    subtree_pops = _calc_pops(succ, root, h)
+    subtree_pops = _calc_pops(succ, root, h) # should we calculate total areas here for the districts that satisfy the population condition?
 
     cuts = []
 
     if one_sided_cut:
+        
+        if add_root == True:
+            subtree_pops[root] = total_pop
+            artifical_node = -1
+            h.graph.add_node(artifical_node)
+            h.graph.add_edge(root, artifical_node)
+            pred[root] = artifical_node
+        
+            
         for node, tree_pop in subtree_pops.items():
-            if abs(tree_pop - h.ideal_pop) <= h.ideal_pop * h.epsilon:
-                e = (node, pred[node])
-                wt = random.random()
-                cuts.append(
-                    Cut(
-                        edge=e,
-                        weight=h.graph.edges[e].get("random_weight", wt),
-                        subset=frozenset(_part_nodes(node, succ)),
-                    )
-                )
-            elif abs((total_pop - tree_pop) - h.ideal_pop) <= h.ideal_pop * h.epsilon:
-                e = (node, pred[node])
-                wt = random.random()
-                cuts.append(
-                    Cut(
-                        edge=e,
-                        weight=h.graph.edges[e].get("random_weight", wt),
-                        subset=frozenset(set(h.graph.nodes) - _part_nodes(node, succ)),
-                    )
-                )
 
-        return cuts
-
-    for node, tree_pop in subtree_pops.items():
-        if (abs(tree_pop - h.ideal_pop) <= h.ideal_pop * h.epsilon) and (
-            abs((total_pop - tree_pop) - h.ideal_pop) <= h.ideal_pop * h.epsilon
-        ):
             part_nodes = _part_nodes(node, succ)
-            if any(h.graph.nodes[node]['real_phc']==True for node in part_nodes):  # checks if there is a center in part_nodes
-                e = (node, pred[node])
-                wt = random.random()
-                cuts.append(
-                    Cut(
-                        edge=e,
-                        weight=h.graph.edges[e].get("random_weight", wt),
-                        subset=frozenset(set(h.graph.nodes) - part_nodes),
-                    )
-                )
+            assign_team = 1
+            
+            while assign_team < h.hierarchy + 1 and h.n_teams:
+                if abs(tree_pop - assign_team * h.ideal_pop) <= h.ideal_pop * assign_team * h.epsilon:    
+                        
+                    if any(h.graph.nodes[node]['real_phc']==True for node in part_nodes):
+                        e = (node, pred[node])
+                        wt = random.random()
+                        cuts.append(
+                            Cut(
+                                edge=e,
+                                weight=h.graph.edges[e].get("random_weight", wt),
+                                subset=frozenset(part_nodes),
+                                assigned_teams = assign_team
+                                )
+                            )
+                elif abs((total_pop - tree_pop) - assign_team * h.ideal_pop) <= h.ideal_pop * assign_team * h.epsilon:    
+                    if any(h.graph.nodes[node]['real_phc']==True for node in set(h.graph.nodes) - part_nodes):
+                            e = (node, pred[node])
+                            wt = random.random()
+                            cuts.append(
+                                Cut(
+                                    edge=e,
+                                    weight=h.graph.edges[e].get("random_weight", wt),
+                                    subset=frozenset(set(h.graph.nodes) - part_nodes),
+                                    assigned_teams = assign_team
+                                )
+                            )
+                
+                assign_team += 1
+            
+            return cuts
+
+  
+    for node, tree_pop in subtree_pops.items(): 
+        part_nodes = _part_nodes(node, succ)
+        assign_team = 1
+        
+        while assign_team < h.hierarchy + 1 and h.n_teams:
+            if (abs(tree_pop - assign_team * h.ideal_pop) <= h.ideal_pop * assign_team * h.epsilon) and (
+                abs((total_pop - tree_pop) - (h.n_teams - assign_team) * h.ideal_pop) <= h.ideal_pop * (h.n_teams - assign_team) * h.epsilon):
+            
+                # check if there is a center in part_nodes
+                if any(h.graph.nodes[node]['real_phc']==True for node in set(h.graph.nodes) - part_nodes) and any(h.graph.nodes[node]['real_phc']==True for node in part_nodes):  
+                    e = (node, pred[node])
+                    wt = random.random()
+                    cuts.append(
+                        Cut(
+                            edge=e,
+                            weight=h.graph.edges[e].get("random_weight", wt),
+                            subset=frozenset(part_nodes),
+                            assigned_teams = assign_team
+                            )
+                        )
+            assign_team += 1
+            
     return cuts
 
 
@@ -603,12 +642,16 @@ def bipartition_tree(
     graph: nx.Graph,
     pop_col: str,
     pop_target: Union[int, float],
+    average_pop: Union[int, float],
     epsilon: float,
+    hierarchy: int,
+    n_teams: int,
     node_repeats: int = 1,
     spanning_tree: Optional[nx.Graph] = None,
     spanning_tree_fn: Callable = random_spanning_tree,
     region_surcharge: Optional[Dict] = None,
     balance_edge_fn: Callable = find_balanced_edge_cuts_memoization,
+    add_root: bool = False,
     one_sided_cut: bool = False,
     choice: Callable = random.choice,
     max_attempts: Optional[int] = 100000,
@@ -631,9 +674,16 @@ def bipartition_tree(
     :type pop_col: str
     :param pop_target: The target population for the returned subset of nodes.
     :type pop_target: Union[int, float]
+    :param average_pop:
+    :type average_pop:
     :param epsilon: The allowable deviation from ``pop_target`` (as a percentage of
         ``pop_target``) for the subgraph's population.
     :type epsilon: float
+    :param hierarchy: The maximum number of doctor-nurse teams in a facility, 
+        If it is 1, n_teams many districts are created.
+    :type hierarchy: int
+    :param n_teams: Number of doctor-nurse teams for the facilities in the subgraph.
+    :type n_teams: int
     :param node_repeats: A parameter for the algorithm: how many different choices
         of root to use before drawing a new spanning tree. Defaults to 1.
     :type node_repeats: int, optional
@@ -681,41 +731,41 @@ def bipartition_tree(
     :raises RuntimeError: If a possible cut cannot be found after the maximum number of attempts
         given by ``max_attempts``.
     """
-    # Try to add the region-aware in if the spanning_tree_fn accepts a surcharge dictionary
+
     if "region_surcharge" in signature(spanning_tree_fn).parameters:
         spanning_tree_fn = partial(spanning_tree_fn, region_surcharge=region_surcharge)
 
-    if "one_sided_cut" in signature(balance_edge_fn).parameters:
+    if "one_sided_cut" in signature(balance_edge_fn).parameters: # for initial solution, i.e., recursive_tree_part function
         balance_edge_fn = partial(balance_edge_fn, one_sided_cut=one_sided_cut)
 
     populations = {node: graph.nodes[node][pop_col] for node in graph.node_indices}
 
     possible_cuts: List[Cut] = []
     if spanning_tree is None:
-        spanning_tree = spanning_tree_fn(graph)
+        spanning_tree = spanning_tree_fn(graph)  # does this make sense for the initial solution?
 
     restarts = 0
     attempts = 0
 
     while max_attempts is None or attempts < max_attempts:
         if restarts == node_repeats:
-            spanning_tree = spanning_tree_fn(graph)  # does this make sense for the initial solution?
+            spanning_tree = spanning_tree_fn(graph) 
             restarts = 0
-        h = PopulatedGraph(spanning_tree, populations, pop_target, epsilon) # does this preserve graph attributes? Center locations?
+        h = PopulatedGraph(spanning_tree, populations, pop_target, average_pop, epsilon, n_teams, hierarchy) 
 
         is_region_cut = (
             "region_surcharge" in signature(cut_choice).parameters
             and "populated_graph" in signature(cut_choice).parameters
         )
 
-        # This returns a list of Cut objects with attributes edge and subset
-        possible_cuts = balance_edge_fn(h, choice=choice)
+        # This returns a list of Cut objects with attributes edge, subset, team.
+        possible_cuts = balance_edge_fn(h, hierarchy=hierarchy, add_root = add_root, choice=choice)
 
         if len(possible_cuts) != 0:
             if is_region_cut:
-                return cut_choice(h, region_surcharge, possible_cuts).subset
+                return cut_choice(h, region_surcharge, possible_cuts) # returns the object, not only subset attribute.
 
-            return cut_choice(possible_cuts).subset
+            return cut_choice(possible_cuts)
 
         restarts += 1
         attempts += 1
@@ -741,32 +791,37 @@ def bipartition_tree(
 
 def recursive_tree_part(
     graph: nx.Graph,
-    parts: Sequence,
+    n_teams: int,
     pop_target: Union[float, int],
     pop_col: str,
     epsilon: float,
+    hierarchy: int,
     node_repeats: int = 1,
+    balance_final_districts: bool = True,
     method: Callable = partial(bipartition_tree, max_attempts=10000),
 ) -> Dict:
+    # change the description below
     """
-    Uses :func:`~gerrychain.tree.bipartition_tree` recursively to partition a tree into
+    Uses :func:`~gerrychain.tree.bipartition_tree` recursively to partition a tree into. 
     ``len(parts)`` parts of population ``pop_target`` (within ``epsilon``). Can be used to
     generate initial seed plans or to implement ReCom-like "merge walk" proposals.
 
     :param graph: The graph to partition into ``len(parts)`` :math:`\varepsilon`-balanced parts.
     :type graph: nx.Graph
-    :param parts: Iterable of part (district) labels (like ``[0,1,2]`` or ``range(4)``).
-    :type parts: Sequence
+    :param n_teams: Total number of doctor-nurse teams for all facilities.
+    :type n_teams: int
     :param pop_target: Target population for each part of the partition.
     :type pop_target: Union[float, int]
     :param pop_col: Node attribute key holding population data.
     :type pop_col: str
-    :param epsilon: How far (as a percentage of ``pop_target``) from ``pop_target`` the parts
-        of the partition can be.
+    :param epsilon: How far (as a percentage of ``pop_target``) from ``pop_target`` the parts of the partition can be.
     :type epsilon: float
-    :param node_repeats: Parameter for :func:`~gerrychain.tree_methods.bipartition_tree` to use.
-        Defaluts to 1.
+    :param hierarchy: The maximum number of doctor-nurse teams in a facility, If it is 1, n_teams many districts are created.
+    :type hierarchy: int
+    :param node_repeats: Parameter for :func:`~gerrychain.tree_methods.bipartition_tree` to use. Defaluts to 1.
     :type node_repeats: int, optional
+    :param balance_final_districts:
+    :type balance_final_districts: bool, optional
     :param method: The partition method to use. Defaults to
         `partial(bipartition_tree, max_attempts=10000)`.
     :type method: Callable, optional
@@ -774,8 +829,10 @@ def recursive_tree_part(
     :returns: New assignments for the nodes of ``graph``.
     :rtype: dict
     """
-    flips = {}
+    flips = {}  # maps nodes to their districts
+    remaining_teams = n_teams  
     remaining_nodes = graph.node_indices
+    
     # We keep a running tally of deviation from ``epsilon`` at each partition
     # and use it to tighten the population constraints on a per-partition
     # basis such that every partition, including the last partition, has a
@@ -783,75 +840,116 @@ def recursive_tree_part(
     # For instance, if district n's population exceeds the target by 2%
     # with a +/-2% epsilon, then district n+1's population should be between
     # 98% of the target population and the target population.
+    #"Change  this later"
+    # Hierarchy Update: We multiply min_pop and max_pop by hierarchy_level of a 
+    # district to set its population target correctly. This enlarges error bounds
+    # for districts with high population densities. 
+    
     debt: Union[int, float] = 0
+    district = 1
+    average_pop = pop_target
+    
 
-    lb_pop = pop_target * (1 - epsilon)
-    ub_pop = pop_target * (1 + epsilon)
+    lb_pop = pop_target * (1 - epsilon) #"Change  this later"
+    ub_pop = pop_target * (1 + epsilon) 
     check_pop = lambda x: lb_pop <= x <= ub_pop
 
-    for part in parts[:-2]:
-        min_pop = max(pop_target * (1 - epsilon), pop_target * (1 - epsilon) - debt)
-        max_pop = min(pop_target * (1 + epsilon), pop_target * (1 + epsilon) - debt)
-        new_pop_target = (min_pop + max_pop) / 2
+    while remaining_teams > hierarchy: # to make sure that last district is balanced as well
+            
+        min_pop = max(pop_target * (1 - epsilon), pop_target * (1 - epsilon) - debt) #' think about this. you are multiplying debt by n_teams in bipartition_tree.'
+        max_pop = min(pop_target * (1 + epsilon), pop_target * (1 + epsilon) - debt) 
+        pop_target = (min_pop + max_pop) / 2
 
         try:
-            nodes = method(
+            cut_object = method(
                 graph.subgraph(remaining_nodes),
                 pop_col=pop_col,
-                pop_target=new_pop_target,
-                epsilon=(max_pop - min_pop) / (2 * new_pop_target),
+                pop_target=pop_target, 
+                average_pop=average_pop,
+                hierarchy=hierarchy,
+                n_teams=remaining_teams,
+                epsilon=(max_pop - min_pop) / (2 * pop_target),
                 node_repeats=node_repeats,
-                one_sided_cut=True,
+                add_root=False,
+                one_sided_cut=True,  
             )
         except Exception:
             raise
-
+        
+        nodes = cut_object.subset 
+        
         if nodes is None:
             raise BalanceError()
+        
+        hired_teams = cut_object.assigned_teams # number teams hired for 'nodes'
 
         part_pop = 0
         for node in nodes:
-            flips[node] = part
+            flips[node] = district
             part_pop += graph.nodes[node][pop_col]
 
-        if not check_pop(part_pop):
+        if not check_pop(part_pop):   #  hired_teams?
             raise PopulationBalanceError()
 
         debt += part_pop - pop_target
         remaining_nodes -= nodes
+        remaining_teams -= hired_teams
+        district += 1
 
-    # After making n-2 districts, we need to make sure that the last
-    # two districts are both balanced.
-    nodes = method(
-        graph.subgraph(remaining_nodes),
-        pop_col=pop_col,
-        pop_target=pop_target,
-        epsilon=epsilon,
-        node_repeats=node_repeats,
-        one_sided_cut=False,
-    )
+    # remaining_teams <= hierarchy. We ...
+    while remaining_teams > 0:
+        
+        min_pop = max(pop_target * (1 - epsilon), pop_target * (1 - epsilon) - debt) #'think about this. you are multiplying debt by n_teams in bipartition_tree.'
+        max_pop = min(pop_target * (1 + epsilon), pop_target * (1 + epsilon) - debt) 
+        pop_target = (min_pop + max_pop) / 2
 
-    if nodes is None:
-        raise BalanceError()
+        try:
+            cut_object = method(
+                graph.subgraph(remaining_nodes),
+                pop_col=pop_col,
+                pop_target=pop_target, 
+                average_pop=average_pop,
+                hierarchy=hierarchy,
+                n_teams=remaining_teams,
+                epsilon=(max_pop - min_pop) / (2 * pop_target),
+                node_repeats=node_repeats,
+                add_root=True,
+                one_sided_cut=True,
+            )
+        except Exception:
+            raise
+        
 
-    part_pop = 0
-    for node in nodes:
-        flips[node] = parts[-2]
-        part_pop += graph.nodes[node][pop_col]
+        edge = cut_object.edge
+        nodes = cut_object.subset 
+        
+        if nodes is None:
+            raise BalanceError()
+        
+        if edge[0] or edge[1] == -1:
+            hired_teams = remaining_teams
+        else:
+            hired_teams = cut_object.assigned_teams
+        
+        part_pop = 0
+        for node in nodes:
+            flips[node] = district
+            part_pop += graph.nodes[node][pop_col]
 
-    if not check_pop(part_pop):
-        raise PopulationBalanceError()
+        if not check_pop(part_pop):   #  hired_teams?
+            raise PopulationBalanceError()
 
-    remaining_nodes -= nodes
+        debt += part_pop - pop_target
+        remaining_nodes -= nodes
+        remaining_teams -= hired_teams  # if root is choosen, remaining_teams is zero, loop stops.
+        district += 1
+        
+        
+    # remaining_teams = 0. Check if remaining_nodes is empty.
+    if remaining_nodes != 
+   
 
-    # All of the remaining nodes go in the last part
-    part_pop = 0
-    for node in remaining_nodes:
-        flips[node] = parts[-1]
-        part_pop += graph.nodes[node][pop_col]
 
-    if not check_pop(part_pop):
-        raise PopulationBalanceError()
 
     return flips
 

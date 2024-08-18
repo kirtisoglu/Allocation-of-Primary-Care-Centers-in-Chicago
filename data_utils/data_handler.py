@@ -6,8 +6,6 @@ import os
 import json
 import gzip
 import pickle
-import matplotlib.pyplot as plt
-from importlib import resources
 
 import numpy as np
 from pympler import asizeof
@@ -21,7 +19,7 @@ from typing import Any
 class DataHandler: ### Edit initialization for logical consistency. If full_path is given?   
     
     
-    def __init__(self, base_path=None, base_path_2=None):
+    def __init__(self, base_path=None, base_path_2=None, base_path_3=None):
         
         if base_path == None:
             self.base_path = "/Users/kirtisoglu/Documents/GitHub/Allocation-of-Primary-Care-Centers-in-Chicago/data"
@@ -32,6 +30,12 @@ class DataHandler: ### Edit initialization for logical consistency. If full_path
             self.base_path_2 = "/Users/kirtisoglu/Documents/GitHub/Allocation-of-Primary-Care-Centers-in-Chicago/prepared_data"
         else:
             self.base_path_2 = base_path_2
+            
+        if base_path_3 == None:
+            self.base_path_3 = "/Users/kirtisoglu/Documents/GitHub/Allocation-of-Primary-Care-Centers-in-Chicago/gerrychain/results"
+        else: 
+            self.base_path_3 = base_path_3
+            
             
             
         self.files = self.detect_existing_data()
@@ -51,7 +55,7 @@ class DataHandler: ### Edit initialization for logical consistency. If full_path
         Splits and saves names of files in a dictionary."""
         files = {}
             
-        for path in [self.base_path, self.base_path_2]: # iterates over files in the directories
+        for path in [self.base_path, self.base_path_2, self.base_path_3]: # iterates over files in the directories
             for filename in os.listdir(path):  # iterates over files in the directories
                 full_path = os.path.join(path, filename)
                 if os.path.isfile(full_path):  # checks if full_path is a file

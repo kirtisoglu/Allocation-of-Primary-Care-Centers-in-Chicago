@@ -1,13 +1,16 @@
 import json
 import networkx
-
+import folium
+import folium.plugins
 
 from updaters import compute_edge_flows, flows_from_changes, cut_edges
 from .assignment import get_assignment
 from .subgraphs import SubgraphView
 from xx_graph import *
 from tree import recursive_tree_part
+from data_utils import DataHandler
 from typing import Any, Callable, Dict, Optional, Tuple
+
 
 
 class Partition:
@@ -24,6 +27,13 @@ class Partition:
     :type parts: Dict
     :ivar subgraphs: Maps district IDs to the induced subgraph of that district.
     :type subgraphs: Dict
+    
+    :ivar radius: 
+    :type radius:
+    :ivar centers: 
+    :type centers:
+    :ivar candidates: 
+    :type candidates: 
     """
 
     __slots__ = (
@@ -36,12 +46,18 @@ class Partition:
         "flows",
         "edge_flows",
         "_cache",
+        "candidates",
+        "radius",
+        "centers",
+        "travel_times",
     )
+
 
     default_updaters = {"cut_edges": cut_edges}
 
     def __init__(
         self,
+        travel_times=None,
         graph=None,
         assignment=None,
         updaters=None,
@@ -57,6 +73,8 @@ class Partition:
             which the functions compute.
         :param use_default_updaters: If `False`, do not include default updaters.
         """
+        
+
         if parent is None:
             self._first_time(graph, assignment, updaters, use_default_updaters)
         else:
@@ -64,17 +82,22 @@ class Partition:
 
         self._cache = dict()
         self.subgraphs = SubgraphView(self.graph, self.parts)
+        self.travel_times = travel_times
+        self._part_calculations()
+
+                
 
     @classmethod
     def from_random_assignment(
         cls,
+        travel_times: Dict,
         graph: Graph,
-        n_parts: int,
+        n_teams: int,
+        hierarchy: int,
         epsilon: float,
         pop_col: str,
         updaters: Optional[Dict[str, Callable]] = None,
         use_default_updaters: bool = True,
-        flips: Optional[Dict] = None,
         method: Callable = recursive_tree_part,
     ) -> "Partition":
         """
@@ -82,8 +105,10 @@ class Partition:
 
         :param graph: The graph to create the Partition from.
         :type graph: :class:`~gerrychain.Graph`
-        :param n_parts: The number of districts to divide the nodes into.
-        :type n_parts: int
+        :param n_teams:The number of doctor-nurse teams to hire at centers
+        :type n_teams: int
+        :param hierarchy: The maximum number of doctor nurse teams at a facility
+        :type hierarchy: int
         :param epsilon: The maximum relative population deviation from the ideal
         :type epsilon: float
             population. Should be in [0,1].
@@ -93,8 +118,6 @@ class Partition:
         :type updaters: Optional[Dict[str, Callable]], optional
         :param use_default_updaters: If `False`, do not include default updaters.
         :type use_default_updaters: bool, optional
-        :param flips: Dictionary assigning nodes of the graph to their new districts.
-        :type flips: Optional[Dict], optional
         :param method: The function to use to partition the graph into ``n_parts``. Defaults to
             :func:`~gerrychain.tree.recursive_tree_part`.
         :type method: Callable, optional
@@ -103,22 +126,24 @@ class Partition:
         :rtype: Partition
         """
         total_pop = sum(graph.nodes[n][pop_col] for n in graph)
-        ideal_pop = total_pop / n_parts
+        ideal_pop = total_pop / n_teams # if hierarchy is 1, n_teams becomes number of districts.
 
         assignment = method(
             graph=graph,
-            parts=range(n_parts),
+            n_teams=n_teams,  # replaced with n_parts
             pop_target=ideal_pop,
             pop_col=pop_col,
             epsilon=epsilon,
+            hierarchy=hierarchy
         )
-
         return cls(
+            travel_times,
             graph,
             assignment,
             updaters,
             use_default_updaters=use_default_updaters,
         )
+
 
     def _first_time(self, graph, assignment, updaters, use_default_updaters):
         if isinstance(graph, Graph):
@@ -151,6 +176,33 @@ class Partition:
         self.flows = None
         self.edge_flows = None
 
+
+        
+        
+    def _part_calculations(self):
+        candidates = {}
+        centers = {}
+        radius = {}
+        for part, nodes in self.parts.items():
+            part_candidates = {node for node in nodes if self.graph.nodes[node].get("real_phc", False)}  # Take "real_phc" as an input later
+            save_candidates_radius = {}
+            for candidate in part_candidates:
+                candidate_radius = max(self.travel_times[(node, candidate)] for node in nodes)
+                #print('candidate_radius', candidate_radius)
+                save_candidates_radius[candidate] = candidate_radius
+                #print('save_candidates_radius', save_candidates_radius)
+            best_candidate = min(save_candidates_radius, key=save_candidates_radius.get) # best candidate is saved as the center of the part
+            centers[part] = best_candidate
+            radius[part] = save_candidates_radius[best_candidate]
+            candidates[part] = part_candidates
+        self.candidates = candidates
+        self.radius = radius
+        self.centers = centers
+
+
+
+            
+
     def _from_parent(self, parent: "Partition", flips: Dict) -> None:
         self.parent = parent
         self.flips = flips
@@ -165,6 +217,9 @@ class Partition:
 
         if "cut_edges" in self.updaters:
             self.edge_flows = compute_edge_flows(self)
+        
+        
+        
 
     def __repr__(self):
         number_of_parts = len(self)
@@ -183,7 +238,7 @@ class Partition:
         :returns: the new :class:`Partition`
         :rtype: Partition
         """
-        return self.__class__(parent=self, flips=flips)
+        return self.__class__(parent=self, travel_times=self.travel_times, flips=flips)
 
     def crosses_parts(self, edge: Tuple) -> bool:
         """
@@ -219,7 +274,8 @@ class Partition:
     @property
     def parts(self):
         return self.assignment.parts
-
+    
+    
     def plot(self, geometries=None, **kwargs):
         """
         Plot the partition, using the provided geometries.
@@ -250,49 +306,75 @@ class Partition:
             {"assignment": assignment_series}, geometry=geometries
         )
         return df.plot(column="assignment", **kwargs)
+    
+    
+    def plot_map(self, attr):
+        
+        handler = DataHandler()
+        chicago = handler.load_chicago()
+        geo_centers = handler.load_geo_centers()  ## Define a function for that
 
-    @classmethod
-    def from_districtr_file(
-        cls,
-        graph: Graph,
-        districtr_file: str,
-        updaters: Optional[Dict[str, Callable]] = None,
-    ) -> "Partition":
-        """
-        Create a Partition from a districting plan created with `Districtr`_,
-        a free and open-source web app created by MGGG for drawing districts.
+        chicago[attr] = [self.assignment[node] for node in chicago.index]
+        regions = chicago.dissolve(by=attr, as_index=False)
 
-        The provided ``graph`` should be created from the same shapefile as the
-        Districtr module used to draw the districting plan. These shapefiles may
-        be found in a repository in the `mggg-states`_ GitHub organization, or by
-        request from MGGG.
+        # m = folium.Map([41.85, -87.68], zoom_start=10)
+        m = regions.explore(
+            column=attr,  # make choropleth based on "BoroName" column
+            tooltip=attr,  # show "district" value in tooltip (on hover)
+            popup=True,  # show all values in popup (on click)
+            tiles="OpenStreetMap",  # use "CartoDB positron" or "OpenStreetMap" tiles
+            cmap="Set1",  # use "Set1" matplotlib colormap
+            style_kwds=dict(color="black"),  # use black outline
+            legend_kwds=dict(colorbar=False),
+            #tooltip_kwds=dict(labels=False),  # do not show column label in the tooltip
+            #smooth_factor=2,
+            #fill_opacity=0.3,  #  transparency of fill colors
+            #line_opacity=0.1,  # to de-emphasize border lines
+            #fill_color="RdYlGn_r",  # or "YlGn"
+            #nan_fill_color="white", # Also see nan_fill_opacity=0.4,
+            highlight=True,
+            name = "chicago"
+        )
 
-        .. _`Districtr`: https://mggg.org/Districtr
-        .. _`mggg-states`: https://github.com/mggg-states
+        #Adds a button to enable/disable zoom scrolling
+        folium.plugins.ScrollZoomToggler().add_to(m)
 
-        :param graph: The graph to create the Partition from
-        :type graph: :class:`~gerrychain.Graph`
-        :param districtr_file: the path to the ``.json`` file exported from Districtr
-        :type districtr_file: str
-        :param updaters: dictionary of updaters
-        :type updaters: Optional[Dict[str, Callable]], optional
+        # To make the map full screen
+        folium.plugins.Fullscreen(
+            position="topright",
+            title="Expand me",
+            title_cancel="Exit me",
+            force_separate_button=True,
+        ).add_to(m)
 
-        :returns: The partition created from the Districtr file
-        :rtype: Partition
-        """
-        with open(districtr_file) as f:
-            districtr_plan = json.load(f)
 
-        id_column_key = districtr_plan["idColumn"]["key"]
-        districtr_assignment = districtr_plan["assignment"]
-        try:
-            node_to_id = {node: str(graph.nodes[node][id_column_key]) for node in graph}
-        except KeyError:
-            raise TypeError(
-                "The provided graph is missing the {} column, which is "
-                "needed to match the Districtr assignment to the nodes of the graph."
-            )
+        geo_centers.explore(
+            m=m,  # pass the map object
+            color="black",  # use red color on all points
+            marker_kwds=dict(radius=3, fill=True),  # make marker radius 10px with fill
+            name="Candidates",  # name of the layer in the map
+        )
+        #folium.TileLayer("CartoDB positron", show=False).add_to(m)  
+        # use folium to add alternative tiles
+        folium.LayerControl().add_to(m)  # use folium to add layer control
 
-        assignment = {node: districtr_assignment[node_to_id[node]] for node in graph}
 
-        return cls(graph, assignment, updaters)
+        # Side by side Layers: control=False  to add a layer control to your map
+        #m = folium.Map(location=(30, 20), zoom_start=4)
+
+        #layer_right = folium.TileLayer('openstreetmap')
+        #layer_left = folium.TileLayer('cartodbpositron')
+
+        #sbs = folium.plugins.SideBySideLayers(layer_left=layer_left, layer_right=layer_right)
+
+        #layer_left.add_to(m)
+        #layer_right.add_to(m)
+        #sbs.add_to(m)
+
+        return m, regions, chicago, geo_centers 
+
+    
+    
+    
+    
+

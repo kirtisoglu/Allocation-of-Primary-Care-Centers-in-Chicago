@@ -1,10 +1,10 @@
-pandas==2.2.1
+pandas==1.5.3
 numpy==1.26.4
-geopandas==0.14.3
+geopandas==1.0.1
 networkx==3.2.1
 plotly==5.20.0
 typing_extensions==4.11.0
-gerrychain==0.3.1
+gerrychain==0.2.22
 shapely==2.0.3
 matplotlib==3.8.3
 Pympler==1.0.1

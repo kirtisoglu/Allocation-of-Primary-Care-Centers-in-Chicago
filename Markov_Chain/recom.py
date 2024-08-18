@@ -242,3 +242,6 @@ class ReCom:
         return recom(
             partition, self.pop_col, self.ideal_pop, self.epsilon, method=self.method
         )
+        
+        
+        import requests

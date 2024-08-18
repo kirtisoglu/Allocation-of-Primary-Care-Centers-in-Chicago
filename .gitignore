@@ -2,6 +2,7 @@ google_transit/
 prepared_data/
 data_prep/
 data/
+arcgis_data/
 .vscode/
 .ipynb_checkpoints/
 __pycache__/

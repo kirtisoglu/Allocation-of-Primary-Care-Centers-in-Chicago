@@ -156,3 +156,5 @@ def slow_reversible_propose(partition: Partition) -> Partition:
 
     flip = random.choice(list(b_nodes))
     return partition.flip({flip[0]: flip[1]})
+
+

@@ -30,4 +30,3 @@ We extract its Chicago subdata by matching with 2020 Chicago tract IDs provided 
 
 
 
-

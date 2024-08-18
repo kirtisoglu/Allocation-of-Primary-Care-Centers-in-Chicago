@@ -73,21 +73,20 @@ def get_digraph(graph):
     - A directed NetworkX graph (nx.DiGraph instance) where each undirected edge
       is represented as two directed edges.
     """
-
-    # Create a new directed graph
     digraph = nx.DiGraph()
-
-    # Add nodes from the original graph to maintain node attributes
     digraph.add_nodes_from(graph.nodes(data=True))
 
-    # Add edges to the directed graph; each edge becomes a directed edge
     for u, v, data in graph.edges(data=True):
         digraph.add_edge(u, v, **data)
         digraph.add_edge(v, u, **data)  # Add the reverse edge
 
     return digraph
 
-
+def add_stops(graph, stops):
+    "Takes a networkx dual graph and Google GTFS stop.txt file and adds stops to the graph as nodes."
+    
+    
+    return
 
 
 

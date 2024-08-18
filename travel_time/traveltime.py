@@ -14,7 +14,10 @@ import pandas as pd
 
 
 
-def travel_time_to_source(graph, source):
+def travel_time_to_source(graph, source, attr=None):
+    
+    if attr == None:
+        attr = 'time'
 
     travel_time = {node: float('infinity') for node in graph.nodes}  # Dictionary. Key: node, Value: time to source
     travel_time[source] = 0   # initialize the time of source to itself as 0.
@@ -27,7 +30,7 @@ def travel_time_to_source(graph, source):
             continue # If the current travel_time is greater than the recorded travel_time, skip
         
         for neighbor in graph[current_node].keys():
-            temporary_travel_time = current_travel_time + graph[current_node][neighbor]['time']
+            temporary_travel_time = current_travel_time + graph[current_node][neighbor][attr]
 
 
             # If a shorter path is found, update the travel_time and push it to the priority queue
@@ -40,13 +43,16 @@ def travel_time_to_source(graph, source):
 
 
 
-def travel_time(graph, sources):
+def travel_time(graph, sources, attr=None):
+    
+    if attr == None:
+        attr = 'time'
     
     t = {}  # key: (node i, facility j), value: travel time from node i to facility j
     #sources = {**existing, **possible}
 
     for j in sources:
-        to_source = travel_time_to_source(graph, j)
+        to_source = travel_time_to_source(graph, j, attr=attr)
         for i in graph.nodes:
             t[(i, j)] = to_source[i]
 
