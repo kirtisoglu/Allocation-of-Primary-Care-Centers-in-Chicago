@@ -567,15 +567,7 @@ def find_balanced_edge_cuts_memoization(
     cuts = []
 
     if one_sided_cut:
-        
-        if add_root == True:
-            subtree_pops[root] = total_pop
-            artifical_node = -1
-            h.graph.add_node(artifical_node)
-            h.graph.add_edge(root, artifical_node)
-            pred[root] = artifical_node
-        
-            
+          
         for node, tree_pop in subtree_pops.items():
 
             part_nodes = _part_nodes(node, succ)
@@ -585,6 +577,7 @@ def find_balanced_edge_cuts_memoization(
                 if abs(tree_pop - assign_team * h.ideal_pop) <= h.ideal_pop * assign_team * h.epsilon:    
                         
                     if any(h.graph.nodes[node]['real_phc']==True for node in part_nodes):
+                            
                         e = (node, pred[node])
                         wt = random.random()
                         cuts.append(
@@ -612,12 +605,20 @@ def find_balanced_edge_cuts_memoization(
             
             return cuts
 
+    
+    if add_root == True:
+            subtree_pops[root] = total_pop
+            artifical_node = -1
+            h.graph.add_node(artifical_node)
+            h.graph.add_edge(root, artifical_node)
+            pred[root] = artifical_node
+            
   
     for node, tree_pop in subtree_pops.items(): 
         part_nodes = _part_nodes(node, succ)
         assign_team = 1
         
-        while assign_team < h.hierarchy + 1 and h.n_teams:
+        while assign_team < h.hierarchy + 1 and assign_team < h.n_teams:
             if (abs(tree_pop - assign_team * h.ideal_pop) <= h.ideal_pop * assign_team * h.epsilon) and (
                 abs((total_pop - tree_pop) - (h.n_teams - assign_team) * h.ideal_pop) <= h.ideal_pop * (h.n_teams - assign_team) * h.epsilon):
             
@@ -913,8 +914,8 @@ def recursive_tree_part(
                 n_teams=remaining_teams,
                 epsilon=(max_pop - min_pop) / (2 * pop_target),
                 node_repeats=node_repeats,
-                add_root=True,
-                one_sided_cut=True,
+                add_root=True,   # this is the key point of that loop
+                one_sided_cut=False,
             )
         except Exception:
             raise
@@ -925,11 +926,13 @@ def recursive_tree_part(
         
         if nodes is None:
             raise BalanceError()
+            
         
         if edge[0] or edge[1] == -1:
             hired_teams = remaining_teams
         else:
             hired_teams = cut_object.assigned_teams
+        
         
         part_pop = 0
         for node in nodes:
@@ -939,16 +942,11 @@ def recursive_tree_part(
         if not check_pop(part_pop):   #  hired_teams?
             raise PopulationBalanceError()
 
-        debt += part_pop - pop_target
-        remaining_nodes -= nodes
         remaining_teams -= hired_teams  # if root is choosen, remaining_teams is zero, loop stops.
+        remaining_nodes -= nodes
+        debt += part_pop - pop_target
+    
         district += 1
-        
-        
-    # remaining_teams = 0. Check if remaining_nodes is empty.
-    if remaining_nodes != 
-   
-
 
 
     return flips
