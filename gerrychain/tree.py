@@ -851,13 +851,13 @@ def recursive_tree_part(
     average_pop = pop_target
     
 
-    lb_pop = pop_target * (1 - epsilon) #"Change  this later"
+    lb_pop = pop_target * (1 - epsilon)
     ub_pop = pop_target * (1 + epsilon) 
-    check_pop = lambda x: lb_pop <= x <= ub_pop
+    check_workload = lambda x: lb_pop <= x <= ub_pop
 
     while remaining_teams > hierarchy: # to make sure that last district is balanced as well
             
-        min_pop = max(pop_target * (1 - epsilon), pop_target * (1 - epsilon) - debt) #' think about this. you are multiplying debt by n_teams in bipartition_tree.'
+        min_pop = max(pop_target * (1 - epsilon), pop_target * (1 - epsilon) - debt) 
         max_pop = min(pop_target * (1 + epsilon), pop_target * (1 + epsilon) - debt) 
         pop_target = (min_pop + max_pop) / 2
 
@@ -889,10 +889,10 @@ def recursive_tree_part(
             flips[node] = district
             part_pop += graph.nodes[node][pop_col]
 
-        if not check_pop(part_pop):   #  hired_teams?
+        if not check_workload(part_pop / hired_teams):  # part_pop / hired_teams is the workload of each D-N team
             raise PopulationBalanceError()
 
-        debt += part_pop - pop_target
+        debt += part_pop / hired_teams - pop_target  # unit debt
         remaining_nodes -= nodes
         remaining_teams -= hired_teams
         district += 1
@@ -900,7 +900,7 @@ def recursive_tree_part(
     # remaining_teams <= hierarchy. We ...
     while remaining_teams > 0:
         
-        min_pop = max(pop_target * (1 - epsilon), pop_target * (1 - epsilon) - debt) #'think about this. you are multiplying debt by n_teams in bipartition_tree.'
+        min_pop = max(pop_target * (1 - epsilon), pop_target * (1 - epsilon) - debt) 
         max_pop = min(pop_target * (1 + epsilon), pop_target * (1 + epsilon) - debt) 
         pop_target = (min_pop + max_pop) / 2
 
@@ -939,12 +939,12 @@ def recursive_tree_part(
             flips[node] = district
             part_pop += graph.nodes[node][pop_col]
 
-        if not check_pop(part_pop):   #  hired_teams?
+        if not check_workload(part_pop / hired_teams):   
             raise PopulationBalanceError()
 
         remaining_teams -= hired_teams  # if root is choosen, remaining_teams is zero, loop stops.
         remaining_nodes -= nodes
-        debt += part_pop - pop_target
+        debt += part_pop / hired_teams - pop_target
     
         district += 1
 
