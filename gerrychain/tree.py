@@ -801,11 +801,8 @@ def recursive_tree_part(
     balance_final_districts: bool = True,
     method: Callable = partial(bipartition_tree, max_attempts=10000),
 ) -> Dict:
-    # change the description below
     """
-    Uses :func:`~gerrychain.tree.bipartition_tree` recursively to partition a tree into. 
-    ``len(parts)`` parts of population ``pop_target`` (within ``epsilon``). Can be used to
-    generate initial seed plans or to implement ReCom-like "merge walk" proposals.
+     Recursively partitions a graph into balanced districts using bipartition_tree.
 
     :param graph: The graph to partition into ``len(parts)`` :math:`\varepsilon`-balanced parts.
     :type graph: nx.Graph
@@ -832,7 +829,10 @@ def recursive_tree_part(
     """
     flips = {}  # maps nodes to their districts
     remaining_teams = n_teams  
-    remaining_nodes = graph.node_indices
+    remaining_nodes = set(graph.nodes())
+    debt = 0
+    district = 1
+    average_pop = pop_target
     
     # We keep a running tally of deviation from ``epsilon`` at each partition
     # and use it to tighten the population constraints on a per-partition
@@ -846,13 +846,8 @@ def recursive_tree_part(
     # district to set its population target correctly. This enlarges error bounds
     # for districts with high population densities. 
     
-    debt: Union[int, float] = 0
-    district = 1
-    average_pop = pop_target
-    
 
-    lb_pop = pop_target * (1 - epsilon)
-    ub_pop = pop_target * (1 + epsilon) 
+    lb_pop, ub_pop = pop_target *(1- epsilon), pop_target * (1 + epsilon) 
     check_workload = lambda x: lb_pop <= x <= ub_pop
 
     while remaining_teams > hierarchy: # to make sure that last district is balanced as well

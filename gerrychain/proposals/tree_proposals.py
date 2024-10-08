@@ -81,9 +81,6 @@ def recom(
     :type epsilon: float
     :param node_repeats: The number of times to repeat the bipartitioning step. Default is 1.
     :type node_repeats: int, optional
-    :param region_surcharge: The surcharge dictionary for the graph used for region-aware
-        partitioning of the grid. Default is None.
-    :type region_surcharge: Optional[Dict], optional
     :param method: The method used for bipartitioning the tree. Default is
         :func:`~gerrychain.tree.bipartition_tree`.
     :type method: Callable, optional
@@ -95,10 +92,6 @@ def recom(
     bad_district_pairs = set()
     n_parts = len(partition)
     tot_pairs = n_parts * (n_parts - 1) / 2  # n choose 2
-
-    # Try to add the region aware in if the method accepts the surcharge dictionary
-    if "region_surcharge" in signature(method).parameters:
-        method = partial(method, region_surcharge=region_surcharge)
 
     while len(bad_district_pairs) < tot_pairs:
         try:
