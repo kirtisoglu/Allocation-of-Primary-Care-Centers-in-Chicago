@@ -1,6 +1,29 @@
-# Allocation of Primary Care Centers in the Chicago Area 
+# Hierarchical Facility Location with a Case Study of Chicago Healthcare Network
 
-This project aims to optimize the allocation of primary care centers in Chicago using advanced data analysis and optimization techniques. We tested a flip-based local search and a recombination method using Markov chains. We utilize Chicago transportation data for calculating travel times between any two blocks in the city, locations of primary care centers, and the Chicago Census data at the block level. A shortest-path algorithm estimates the travel times between any pair of Census blocks. Once we submit the research paper, we will clean the code and explain the components. The Gerrychain directory is the main folder for the recombination method by Markov chains.  
+This project tackles the complex challenge of hierarchical facility location optimization, considering all possible design conditions. Our approach combines advanced mathematical modeling with innovative computational methods to precisely solve the problem on a large-scale dataset.
+
+Key Features:
+Integer Programming Formulation: We've developed a robust mathematical model using integer programming to represent the facility location problem.
+Markov Chain Optimization: Our solution employs an iterative Markov chain process, where each state represents a valid graph partitioning corresponding to a geographical redistricting scheme.
+A Novel Sampling Method: Inspired by the ReComb method (DeFord et al., 2019), we have created an efficient spanning tree sampling technique to explore the solution space efficiently.
+Local Search Algorithms: We have improved upon two flip-based local search algorithms, providing a benchmark for our sampling method.
+Case Study: Chicago Healthcare Accessibility
+Our research applies this methodology to a real-world scenario: optimizing the location of new primary care facilities in Chicago to reduce healthcare access inequality via public transportation.
+Transportation Network Analysis: We have constructed a real-world transportation network and calculated travel times between candidate facility locations and Census block centroids.
+Results: Our approach yields convincing results in a short timeframe.
+Current Status: We are in the final stages of preparing our research for publication. Stay tuned for updates on our submission and findings.
+This project provides a practical implementation method for real-world scenarios of the facility location problem, with potential applications across various sectors including healthcare, retail, and public services.
+
+Data
+? Chicago Transit Authority GTFS data
+? Cook County street data
+2020 Illinois Census data at the block level
+2020 Chicago tract IDs
+? Chicago primary care centers, library, and school datasets 
+
+Note: Illinois block data is removed due to its size. You can find it \href[here]{https://redistrictingdatahub.org/state/illinois}.
+We extract its Chicago sub-data by matching it with 2020 Chicago tract IDs provided by the City of Chicago [here](https://www.chicago.gov/content/dam/city/depts/fin/municipal_depository/Addendum_2_Attachment_A_Chicago_Census_Tract%20_11_digit.pdf). We cleaned the data and saved it as chicago_tracts.csv in our data folder.
+
 
 
 ## Prerequisites
