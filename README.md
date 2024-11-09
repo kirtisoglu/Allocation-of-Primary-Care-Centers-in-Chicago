@@ -34,7 +34,7 @@ tested and thus cannot be guaranteed to be fully compatible. For best results, u
 ## Installation
 
 Pipenv is used for managing project dependencies and virtual environments. Follow these steps to set up
-the project environment using Pipenv:
+the project environment using Pipenv: 
 
 ```markdown
 # Install Pipenv

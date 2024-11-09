@@ -1,7 +1,5 @@
-google_transit/
-prepared_data/
-data_prep/
-data/
+falcomchain/prepared_data/
+initial_data/
 arcgis_data/
 .vscode/
 .ipynb_checkpoints/
