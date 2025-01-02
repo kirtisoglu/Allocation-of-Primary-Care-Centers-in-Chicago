@@ -98,3 +98,5 @@ def metagraph_degree(
     :rtype: int
     """
     return len(list(all_valid_states_one_flip_away(partition, constraints)))
+
+

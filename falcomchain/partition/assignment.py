@@ -1,6 +1,6 @@
 from collections import defaultdict
 from collections.abc import Mapping
-from typing import Dict, Union, Optional, DefaultDict, Set, Type
+from typing import Dict, Union, Optional, DefaultDict, Set, Type, Tuple
 from graph import Graph
 
 import pandas
@@ -8,7 +8,7 @@ import pandas
 
 class Assignment(Mapping):
     """
-    An assignment of nodes and doctor-nurse teams into parts.
+    An assignment of nodes into parts.
 
     The goal of :class:`Assignment` is to provide an interface that mirrors a
     dictionary (what we have been using for assigning nodes to districts) while making it
@@ -18,16 +18,21 @@ class Assignment(Mapping):
     ``{part: <frozenset of nodes in part>}``.
     """
 
-    __slots__ = ["parts", "mapping"]
+    __slots__ = ["parts", "mapping", "centers", "radius", "candidates"]
 
     def __init__(
-        self, parts: Dict, mapping: Optional[Dict] = None, validate: bool = True
+        self, parts: Dict, candidates: Dict, travel_times: Dict, mapping: Optional[Dict] = None, validate: bool = True
     ) -> None:
         """
         :param parts: Dictionary mapping partition assignments frozensets of nodes.
         :type parts: Dict
-        :param mapping: Dictionary mapping nodes to partition assignments.
-            Default is None.
+        :param centers:
+        :type parts: Dict
+        :param radius:
+        :type parts: Dict
+        :param candidates:
+        :type parts: Dict 
+        :param mapping: Dictionary mapping nodes to partition assignments. Default is None.
         :type mapping: Optional[Dict], optional
         :param validate: Whether to validate the assignment. Default is True.
         :type validate: bool, optional
@@ -44,7 +49,14 @@ class Assignment(Mapping):
                 raise ValueError("Keys must have unique assignments.")
             if not all(isinstance(keys, frozenset) for keys in parts.values()):
                 raise TypeError("Level sets must be frozensets")
+        
         self.parts = parts
+        self.candidates = candidates
+        
+        self.centers = {} 
+        self.radius = {}
+        for part in parts.keys():
+            self.centers[part], self.radius[part] = self.facility_assignment(part, travel_times)
 
         if not mapping:
             self.mapping = {}
@@ -66,36 +78,43 @@ class Assignment(Mapping):
     def __getitem__(self, node):
         return self.mapping[node]
 
-    def copy(self):
+    # add travel times 
+    def copy(self, travel_times):
         """
         Returns a copy of the assignment.
         Does not duplicate the frozensets of nodes, just the parts dictionary.
         """
-        return Assignment(self.parts.copy(), self.mapping.copy(), validate=False)
+        return Assignment(self.parts.copy(), self.candidates.copy(), travel_times, self.mapping.copy(), validate=False)
 
-    def update_flows(self, flows):
+
+    def candidate_flows(self, flow):
+        print("candidates values", self.candidates.values())
+        listoffrozensets = [s for s in self.candidates.values()]
+        all_candidates = frozenset().union(*listoffrozensets)
+        print("all candidates after union", all_candidates)
+        return flow["in"] & all_candidates 
+     
+
+    def update_flows(self, flows, travel_times):
         """
         Update the assignment for some nodes using the given flows.
         """
         for part, flow in flows.items():
+            print("part", part)
+            print("flow", flow)
+            print("parts[part]", self.parts[part])
             # Union between frozenset and set returns an object whose type
             # matches the object on the left, which here is a frozenset
+            print("flow out", flow['out'])
+            print("flow in", flow["in"])
             self.parts[part] = (self.parts[part] - flow["out"]) | flow["in"]
-
+            print("updated parts[part]", self.parts[part])
+            self.candidates[part] = (self.candidates[part] - flow["out"]) | self.candidate_flows(flow)
+            self.centers[part], self.radius[part] = self.facility_assignment(part, travel_times)
+            print("updated candidates[part]", self.candidates[part])
             for node in flow["in"]:
                 self.mapping[node] = part
-
-    def update_flows(self, flows):
-        """
-        Update the assignment for some teams using the given flows.
-        """
-        for part, flow in flows.items():
-            # Union between frozenset and set returns an object whose type
-            # matches the object on the left, which here is a frozenset
-            self.parts[part] = (self.parts[part] - flow["out"]) | flow["in"]
-
-            for node in flow["in"]:
-                self.mapping[node] = part
+                
                 
     def items(self):
         """
@@ -144,7 +163,7 @@ class Assignment(Mapping):
         return self.mapping
 
     @classmethod
-    def from_dict(cls, assignment: Dict) -> "Assignment":
+    def from_dict(cls, assignment: Dict, graph: Graph, column_names: Tuple[str], travel_times: Dict) -> "Assignment":
         """
         Create an :class:`Assignment` from a dictionary. This is probably the method you want
         to use to create a new assignment.
@@ -158,13 +177,27 @@ class Assignment(Mapping):
             passed-in dictionary.
         :rtype: Assignment
         """
-        parts = {part: frozenset(keys) for part, keys in level_sets(assignment).items()}
+        sets, facilities = level_sets(assignment, graph, column_names)
+        parts = {part: frozenset(keys) for part, keys in sets.items()}
+        candidates = {part: frozenset(keys) for part, keys in facilities.items()}
 
-        return cls(parts)
+        return cls(parts, candidates, travel_times)
+
+    def facility_assignment(self, part, travel_times):
+    
+        save_candidates_radius = {}
+
+        for candidate in self.candidates[part]:
+            candidate_radius = max(travel_times[(node, candidate)] for node in self.parts[part])
+            save_candidates_radius[candidate] = candidate_radius
+            
+        best_candidate = min(save_candidates_radius, key=save_candidates_radius.get) # center of the part
+        
+        return best_candidate, save_candidates_radius[best_candidate]
 
 
 def get_assignment(
-    part_assignment: Union[str, Dict, Assignment], graph: Optional[Graph] = None
+    part_assignment: Union[str, Dict, Assignment], graph: Optional[Graph], column_names: list[str], travel_times: Dict
 ) -> Assignment:
     """
     Either extracts an :class:`Assignment` object from the input graph
@@ -186,24 +219,24 @@ def get_assignment(
         is not provided.
     :raises TypeError: If the part_assignment is not a string or dictionary.
     """
-    if isinstance(part_assignment, str):
-        if graph is None:
-            raise TypeError(
-                "You must provide a graph when using a node attribute for the part_assignment"
-            )
-        return Assignment.from_dict(
-            {node: graph.nodes[node][part_assignment] for node in graph}
-        )
+    #if isinstance(part_assignment, str):
+    #    if graph is None:
+    #        raise TypeError(
+    #            "You must provide a graph when using a node attribute for the part_assignment"
+    #        )
+    #    return Assignment.from_dict(
+    #        {node: graph.nodes[node][part_assignment] for node in graph}
+    #    )
     # Check if assignment is a dict or a mapping type
-    elif callable(getattr(part_assignment, "items", None)):
-        return Assignment.from_dict(part_assignment)
-    elif isinstance(part_assignment, Assignment):
-        return part_assignment
-    else:
-        raise TypeError("Assignment must be a dict or a node attribute key")
+    #elif callable(getattr(part_assignment, "items", None)):
+    return Assignment.from_dict(part_assignment, graph, column_names, travel_times)
+    #elif isinstance(part_assignment, Assignment):
+    #    return part_assignment
+    #else:
+    #    raise TypeError("Assignment must be a dict or a node attribute key")
 
 
-def level_sets(mapping: Dict, container: Type[Set] = set) -> DefaultDict:
+def level_sets(assignment: dict, graph, column_names: list, container: type[Set] = set) -> DefaultDict:
     """
     Inverts a dictionary. ``{key: value}`` becomes
     ``{value: <container of keys that map to value>}``.
@@ -227,6 +260,18 @@ def level_sets(mapping: Dict, container: Type[Set] = set) -> DefaultDict:
         defaultdict(<class 'set'>, {1: {'a', 'b'}, 2: {'c'}})
     """
     sets: Dict = defaultdict(container)
-    for source, target in mapping.items():
-        sets[target].add(source)
-    return sets
+    candidates: Dict = defaultdict(container)
+    facility_attr = 'real_phc'
+
+    for node, part in assignment.items():
+        sets[part].add(node)
+        if graph.nodes[node][facility_attr]==True:
+            candidates[part].add(node)  
+            
+    for part in sets.keys():
+        if not any(graph.nodes[node][facility_attr]==True for node in sets[part]):
+            print(f"Part {part} does not have a candidate.")
+            print(sets[part])
+                 
+    return sets, candidates
+

@@ -7,8 +7,8 @@ from .partition.partition import Partition
 from meta import *
 from .helper import *
 from .travel_time import *
-from prepared_data import *
-
+from .prepared_data import *
+from .grid import Grid, create_grid_graph
 
 
 # Will need to change this to a logging option later

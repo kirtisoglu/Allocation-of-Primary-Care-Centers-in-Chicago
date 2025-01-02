@@ -63,7 +63,6 @@ from .validity import (
     deviation_from_ideal,
     districts_within_tolerance,
     no_vanishing_districts,
-    refuse_new_splits,
     within_percent_of_ideal_population,
 )
 
@@ -87,7 +86,6 @@ __all__ = [
     "deviation_from_ideal",
     "districts_within_tolerance",
     "no_vanishing_districts",
-    "refuse_new_splits",
     "within_percent_of_ideal_population",
     "Bounds",
 ]

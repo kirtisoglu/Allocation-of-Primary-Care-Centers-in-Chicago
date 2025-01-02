@@ -3,13 +3,19 @@ import networkx
 import folium
 import folium.plugins
 
-from updaters import compute_edge_flows, flows_from_changes, cut_edges#, update_teams
+from .cut_edges import cut_edges 
+from .flows import compute_edge_flows, flows_from_changes
+
 from .assignment import get_assignment
 from .subgraphs import SubgraphView
-from graph import *
+from graph import Graph, FrozenGraph
 from tree import capacitated_recursive_tree
 from helper import DataHandler
 from typing import Any, Callable, Dict, Optional, Tuple
+
+from .tally import Tally
+from .compactness import boundary_nodes, exterior_boundaries, interior_boundaries, perimeter
+from .cut_edges import cut_edges, cut_edges_by_part
 
 
 
@@ -27,28 +33,18 @@ class Partition:
     :type parts: Dict
     :ivar subgraphs: Maps district IDs to the induced subgraph of that district.
     :type subgraphs: Dict
-    
-    :ivar radius: 
-    :type radius:
-    :ivar centers: 
-    :type centers:
-    :ivar candidates: 
-    :type candidates: 
     """
 
     __slots__ = (
         "graph",
         "subgraphs",
         "assignment",
-        "updaters", # do we need this?
+        "updaters", 
         "parent",
         "flips",
-        "flows",  # do we need this?
-        "edge_flows", # do we need this?
+        "flows",  
+        "edge_flows", 
         "_cache",
-        "candidates",
-        "radius",
-        "centers",
         "travel_times",
         "teams",
         "capacity_level",
@@ -68,6 +64,7 @@ class Partition:
         parent=None,
         flips=None,
         use_default_updaters=True,
+        column_names: Tuple[str] = None
     ):
         """
         :param graph: Underlying graph.
@@ -80,13 +77,12 @@ class Partition:
         
 
         if parent is None:
-            self._first_time(graph, assignment, updaters, use_default_updaters, travel_times, teams, capacity_level)
+            self._first_time(graph, assignment, updaters, use_default_updaters, travel_times, teams, capacity_level, column_names)
         else:
             self._from_parent(parent, flips, teams)
 
         self._cache = dict()
         self.subgraphs = SubgraphView(self.graph, self.parts)
-        self._part_calculations()
         
 
     @classmethod
@@ -127,10 +123,8 @@ class Partition:
         :returns: The partition created with a random assignment
         :rtype: Partition
         """
-        
-        total_pop = sum(graph.nodes[n][pop_col] for n in graph)
+        total_pop = sum(graph.nodes[n][column_names[0]] for n in graph)
         n_teams = (total_pop // pop_target) # if capacity_level is 1, n_teams becomes number of districts.
-        print("teams:", n_teams)
         assignment, teams = capacitated_recursive_tree(
             graph=graph,
             column_names=column_names,
@@ -138,7 +132,6 @@ class Partition:
             pop_target=pop_target,  
             epsilon=epsilon,
             capacity_level=capacity_level,
-            initial_solution=True,
             density=density
         )
 
@@ -150,10 +143,10 @@ class Partition:
             assignment=assignment,
             updaters=updaters,
             use_default_updaters=use_default_updaters,
+            column_names=column_names
         )
 
-
-    def _first_time(self, graph, assignment, updaters, use_default_updaters, travel_times, teams, capacity_level):
+    def _first_time(self, graph, assignment, updaters, use_default_updaters, travel_times, teams, capacity_level, column_names):
         if isinstance(graph, Graph):
             self.graph = FrozenGraph(graph)
         elif isinstance(graph, networkx.Graph):
@@ -164,10 +157,7 @@ class Partition:
         else:
             raise TypeError(f"Unsupported Graph object with type {type(graph)}")
 
-        self.assignment = get_assignment(assignment, graph)
-
-        if set(self.assignment) != set(graph):
-            raise KeyError("The graph's node labels do not match the Assignment's keys")
+        self.assignment = get_assignment(assignment, graph, column_names, travel_times)
 
         if updaters is None:
             updaters = dict()
@@ -188,32 +178,9 @@ class Partition:
         self.flows = None
         self.edge_flows = None
 
-
-        
-        
-    def _part_calculations(self):
-        candidates = {}
-        centers = {}
-        radius = {}
-        for part, nodes in self.parts.items():
-            part_candidates = {node for node in nodes if self.graph.nodes[node].get("real_phc", False)}  # Take "real_phc" as an input later
-            save_candidates_radius = {}
-            for candidate in part_candidates:
-                candidate_radius = max(self.travel_times[(node, candidate)] for node in nodes)
-                #print('candidate_radius', candidate_radius)
-                save_candidates_radius[candidate] = candidate_radius
-                #print('save_candidates_radius', save_candidates_radius)
-            best_candidate = min(save_candidates_radius, key=save_candidates_radius.get) # best candidate is saved as the center of the part
-            centers[part] = best_candidate
-            radius[part] = save_candidates_radius[best_candidate]
-            candidates[part] = part_candidates
-        self.candidates = candidates
-        self.radius = radius
-        self.centers = centers
-
-
+      
             
-    def _from_parent(self, parent: "Partition", flips: Dict, new_teams: Dict,) -> None:
+    def _from_parent(self, parent: "Partition", flips: Dict, new_teams: Dict) -> None:
         self.parent = parent
         self.flips = flips
 
@@ -222,13 +189,14 @@ class Partition:
         self.travel_times = parent.travel_times
         self.capacity_level = parent.capacity_level
 
-        self.flows = flows_from_changes(parent, self)  # careful
+        self.flows = flows_from_changes(parent, self)  
 
-        self.assignment = parent.assignment.copy()
-        self.assignment.update_flows(self.flows) #?????????????
+        self.assignment = parent.assignment.copy(self.travel_times)
+        self.assignment.update_flows(self.flows, self.travel_times) 
         
         self.teams = parent.teams.copy()
-        self.assignment.update_teams(team_flps)
+        for part in new_teams:
+            self.teams[part] = new_teams[part]
         
         if "cut_edges" in self.updaters:
             self.edge_flows = compute_edge_flows(self)
@@ -246,11 +214,11 @@ class Partition:
 
     def flip(self, flips: Dict, new_teams: Dict) -> "Partition":
         """
-        Returns the new partition obtained by performing the given `flips`
+        Returns the new partition obtained by performing the given `flips` and new_teams.
         on this partition.
 
         :param flips: dictionary assigning nodes of the graph to their new districts
-        :param new_teams: dictionary assigning resplitted districts to new numbers of teams hired for them
+        :param new_teams: dictionary assigning resplitted districts to their new numbers of teams
         
         :returns: the new :class:`Partition`
         """
@@ -291,6 +259,18 @@ class Partition:
     def parts(self):
         return self.assignment.parts
     
+    @property
+    def candidates(self):
+        return self.assignment.candidates
+    
+    @property
+    def centers(self):
+        return self.assignment.centers
+    
+    @property
+    def radius(self):
+        return self.assignment.radius
+    
     
     def plot(self, geometries=None, **kwargs):
         """
@@ -324,73 +304,23 @@ class Partition:
         return df.plot(column="assignment", **kwargs)
     
     
-    def plot_map(self, attr):
-        
-        handler = DataHandler()
-        chicago = handler.load_chicago()
-        geo_centers = handler.load_geo_centers()  ## Define a function for that
-
-        chicago[attr] = [self.assignment[node] for node in chicago.index]
-        regions = chicago.dissolve(by=attr, as_index=False)
-
-        # m = folium.Map([41.85, -87.68], zoom_start=10)
-        m = regions.explore(
-            column=attr,  # make choropleth based on "BoroName" column
-            tooltip=attr,  # show "district" value in tooltip (on hover)
-            popup=True,  # show all values in popup (on click)
-            tiles="OpenStreetMap",  # use "CartoDB positron" or "OpenStreetMap" tiles
-            cmap="Set1",  # use "Set1" matplotlib colormap
-            style_kwds=dict(color="black"),  # use black outline
-            legend_kwds=dict(colorbar=False),
-            #tooltip_kwds=dict(labels=False),  # do not show column label in the tooltip
-            #smooth_factor=2,
-            #fill_opacity=0.3,  #  transparency of fill colors
-            #line_opacity=0.1,  # to de-emphasize border lines
-            #fill_color="RdYlGn_r",  # or "YlGn"
-            #nan_fill_color="white", # Also see nan_fill_opacity=0.4,
-            highlight=True,
-            name = "chicago"
-        )
-
-        #Adds a button to enable/disable zoom scrolling
-        folium.plugins.ScrollZoomToggler().add_to(m)
-
-        # To make the map full screen
-        folium.plugins.Fullscreen(
-            position="topright",
-            title="Expand me",
-            title_cancel="Exit me",
-            force_separate_button=True,
-        ).add_to(m)
 
 
-        geo_centers.explore(
-            m=m,  # pass the map object
-            color="black",  # use red color on all points
-            marker_kwds=dict(radius=3, fill=True),  # make marker radius 10px with fill
-            name="Candidates",  # name of the layer in the map
-        )
-        #folium.TileLayer("CartoDB positron", show=False).add_to(m)  
-        # use folium to add alternative tiles
-        folium.LayerControl().add_to(m)  # use folium to add layer control
+class GeographicPartition(Partition):
+    """
+    A :class:`Partition` with areas, perimeters, and boundary information included.
+    These additional data allow you to compute compactness scores like
+    `Polsby-Popper <https://en.wikipedia.org/wiki/Polsby-Popper_Test>`_.
+    """
 
+    default_updaters = {
+        "perimeter": perimeter,
+        "exterior_boundaries": exterior_boundaries,
+        "interior_boundaries": interior_boundaries,
+        "boundary_nodes": boundary_nodes,
+        "cut_edges": cut_edges,
+        "area": Tally("area", alias="area"),
+        "cut_edges_by_part": cut_edges_by_part,
+    }
 
-        # Side by side Layers: control=False  to add a layer control to your map
-        #m = folium.Map(location=(30, 20), zoom_start=4)
-
-        #layer_right = folium.TileLayer('openstreetmap')
-        #layer_left = folium.TileLayer('cartodbpositron')
-
-        #sbs = folium.plugins.SideBySideLayers(layer_left=layer_left, layer_right=layer_right)
-
-        #layer_left.add_to(m)
-        #layer_right.add_to(m)
-        #sbs.add_to(m)
-
-        return m, regions, chicago, geo_centers 
-
-    
-    
-    
-    
 

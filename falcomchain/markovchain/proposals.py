@@ -1,9 +1,6 @@
 import random
-
 from partition import Partition
 from tree import (capacitated_recursive_tree, ReselectException)
-
-
 
 
 class MetagraphError(Exception):
@@ -25,13 +22,13 @@ class ValueWarning(UserWarning):
 
 
 
-def recom( # Note: recomb is called for each state of the chain. Parameters must be the same for all of them.
+def recom( # Note: recomb is called for each state of the chain. Parameters must be static for the states.
     partition: Partition,
     capacity_level: int,
     pop_target: int,
-    pop_col: str,
+    column_names: tuple[str],
     epsilon: float,
-    node_repeats: int = 1,
+    density: float = None,
 ) -> Partition:
     """
     ReCom (short for ReCombination) is a Markov Chain Monte Carlo (MCMC) algorithm
@@ -74,20 +71,21 @@ def recom( # Note: recomb is called for each state of the chain. Parameters must
                     break
 
             n_teams = partition.teams[part_one] + partition.teams[part_two]
-            subgraph = partition.graph.subgraph(partition.parts[part_one | part_two])
+            subgraph = partition.graph.subgraph(partition.parts[part_one] | partition.parts[part_two])
+            filtered_parts = {part: partition.parts[part] for part in parts_to_merge}
 
-            flips, teams = capacitated_recursive_tree(
-                subgraph.graph,
-                pop_col=pop_col,
+            flips, new_teams = capacitated_recursive_tree(
+                graph = subgraph.graph,
+                filtered_parts = filtered_parts,
+                n_parts = n_parts,
+                column_names = column_names,
                 n_teams=n_teams,
                 pop_target=pop_target,
                 epsilon=epsilon,
                 capacity_level=capacity_level,
-                initial_solution=False,
-                node_repeats=node_repeats)
+                density = density)
             break
-  
-
+   
         except Exception as e:
             if isinstance(e, ReselectException):
                 bad_district_pairs.add(tuple(parts_to_merge))
@@ -100,9 +98,8 @@ def recom( # Note: recomb is called for each state of the chain. Parameters must
             f"Bipartitioning failed for all {tot_pairs} district pairs."
             f"Consider rerunning the chain with a different random seed."
         )
-
-    return partition.flip(flips, teams)
-
+                
+    return partition.flip(flips, new_teams)
 
 
 
@@ -156,3 +153,66 @@ def propose_random_flip(partition: Partition) -> Partition:
     return partition.flip(flip)
 
 
+
+
+class Supergraph:
+    """
+    Generates a supergraph of parts in a partition to pick a random set of parts that does not 
+    exceed the maximum number of teams in total. In each state, we update merged and re-splitted 
+    parts in the metagraph locally.All possible sets of possible neighboring parts are produced 
+    and one of them is uniformly selected.
+    """
+    
+    
+    def __init__(self, partition: Partition, max):
+        
+        self.nodes = set(partition.parts.keys())
+        self.neighborhood = {node: {} for node in self.nodes}
+        
+        for edge in partition.cut_edges:
+            self.neighborhood[partition.assignment.mapping[edge[0]]].add(partition.assignment.mapping[edge[1]])
+            self.neighborhood[partition.assignment.mapping[edge[1]]].add(partition.assignment.mapping[edge[0]])
+
+        self.node_subsets = self.parts_to_merge()
+        
+        sum = sum(partition.radius[part] for part in partition.radius.keys())
+        
+        def __repr__(self):
+            pass
+        
+        def parts_to_merge(self):
+            
+            return
+        
+        
+        def node_ant(self):
+            
+            return
+        
+        
+        def update_supergraph():
+            return
+
+
+
+def weigthted_selection_by_travel_time(partition: Partition):
+   
+    population = list(partition.parts.keys())
+    weight_list = [partition.radius[part] for part in population]
+
+    first_part = random.choices(population, weights=weight_list, k=1)
+        
+    return
+    
+    
+    
+def uniform_selection_from_neighborhoods(partition: Partition):
+
+    population = list(partition.parts.keys())
+
+    first_part = random.choice(population)
+    cuts = {edge for edge in partition.cut_edges if first_part in edge}
+    
+    return        
+    
+    

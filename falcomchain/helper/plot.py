@@ -1,5 +1,9 @@
 
-
+from libpysal import weights
+import networkx as nx
+import numpy as np
+import geopandas 
+from .data_handler import DataHandler
 
 import pandas as pd
 import matplotlib as plt
@@ -12,32 +16,18 @@ from partition import Partition
 import folium
 from folium import plugins
 import geopandas
-
+from datashader.colors import viridis
+import matplotlib.pyplot as pltt
 
 
 class Plot:
 
-    def __init__(self, geo_data, geo_candidates) -> None:
+    def __init__(self) -> None:
 
-        #self._create_properties()
-        #self.show = self.visualize()
-        
-        self.geo_data = geo_data  # name this as data
-        self.geo_candidates = geo_candidates
+        handler = DataHandler()
+        self.geo_data = handler.load_chicago()
+        self.geo_candidates = handler.load_geo_candidates()
 
-
-    #def _create_properties(self):
-    #    """Dynamically creates properties for each file detected."""
-    #    for name in self.files:
-    #        setattr(self, f"load_{name}", self._create_loader(name))
-
-
-    #def _create_loader(self, name):
-    #    """Creates a loader function for a specific file."""
-    #    def loader():
-    #        return self.load(name)
-    #    return loader
-            
 
     def basemap(self):
 
@@ -49,7 +39,7 @@ class Plot:
         return fig
     
     
-    def incomplete():
+    def incomplete_districts():
         return
 
 
@@ -90,7 +80,7 @@ class Plot:
         return fig.show()
     
 
-
+# Plot initial and final solutions side by side
     def compare(self, initial_partition: Partition, final_partition: Partition):
         
         "plots initial and final partitions of recomb chain side by side"
@@ -105,8 +95,8 @@ class Plot:
         
         regions_initial_new = regions_initial.copy()
         regions_final_new = regions_final.copy()
-        regions_initial_new['color'] = [x % 10 for x in range(100)]
-        regions_final_new['color'] = [x % 10 for x in range(100)]
+        regions_initial_new['color'] = [x % 10 for x in range(len(initial_partition))]
+        regions_final_new['color'] = [x % 10 for x in range(len(final_partition))]
         del regions_initial_new['centroid']
         del regions_final_new['centroid']
         regions_initial_json = regions_initial_new.to_json()
@@ -143,6 +133,8 @@ class Plot:
 
         folium.plugins.ScrollZoomToggler().add_to(m) #Adds a button to enable/disable zoom scrolling
 
+        m.add_child(plugins.MeasureControl())  # a tool to measure distance and area on the map
+        
         folium.plugins.Fullscreen(   # To make the map full screen
             position="topright",
             title="Expand me",
@@ -168,6 +160,9 @@ class Plot:
             highlight_function=lambda x: {"fillOpacity": 0.8},
         ).add_to(f)
         
+        
+        f.add_child(plugins.MeasureControl())
+
         # To make the map full screen
         folium.plugins.Fullscreen(
             position="topright",
@@ -196,82 +191,127 @@ class Plot:
         return fig, regions_initial_new, regions_final_new, centers, others
 
 
+# Plot dual graph on geographical map
+    def plot_dual_graph(self, geo_data = None):
+        
+        if geo_data == None:
+            geo_data = self.geo_data
+        centroids = np.column_stack((geo_data.geometry.centroid.x, geo_data.geometry.centroid.y))
+        
+        # construct the "Queen" adjacency graph. In geographical applications,
+        # the "Queen" adjacency graph considers two polygons as connected if
+        # they share a single point on their boundary. 
+        queen = weights.Queen.from_dataframe(geo_data.geometry.centroid)
+        
+        # we can convert the graph to networkx object
+        graph = queen.to_networkx()
+        
+        positions = dict(zip(graph.nodes, centroids))
+        # we need to merge the nodes back to their positions in order to plot in networkx
+        
+        # plot with a nice basemap
+        ax = geo_data.plot(linewidth=1, edgecolor="grey", facecolor="lightblue")
+        ax.axis([-12, 45, 33, 66])
+        ax.axis("off")
+        nx.draw(graph, positions, ax=ax, node_size=5, node_color="r")
+        plt.show()
 
+
+
+
+    def plot_map(assignment, attr):
+        import folium
+        import matplotlib
+        import mapclassify
+
+        handler = DataHandler()
+        chicago = handler.load_chicago()
+        geo_centers = handler.load_geo_centers()  ## Define a function for that
+
+        chicago[attr] = [assignment[node] for node in chicago.index]
+        regions = chicago.dissolve(by=attr, as_index=False)
+
+        # m = folium.Map([41.85, -87.68], zoom_start=10)
+        m = regions.explore(
+            column=attr,  # make choropleth based on "district" column
+            tooltip=attr,  # show "district" value in tooltip (on hover)
+            popup=True,  # show all values in popup (on click)
+            tiles="OpenStreetMap",  # use "CartoDB positron" or "OpenStreetMap" tiles
+            cmap="Set1",  # use "Set1" matplotlib colormap
+            style_kwds=dict(color="black"),  # use black outline
+            legend_kwds=dict(colorbar=False),
+            #tooltip_kwds=dict(labels=False),  # do not show column label in the tooltip
+            #smooth_factor=2,
+            #fill_opacity=0.3,  #  transparency of fill colors
+            #line_opacity=0.1,  # to de-emphasize border lines
+            #fill_color="RdYlGn_r",  # or "YlGn"
+            #nan_fill_color="white", # Also see nan_fill_opacity=0.4,
+            highlight=True,
+            name = "chicago"
+        )
+
+        #Adds a button to enable/disable zoom scrolling
+        folium.plugins.ScrollZoomToggler().add_to(m)
+
+        # To make the map full screen
+        folium.plugins.Fullscreen(
+            position="topright",
+            title="Expand me",
+            title_cancel="Exit me",
+            force_separate_button=True,
+        ).add_to(m)
+
+
+        geo_centers.explore(
+            m=m,  # pass the map object
+            color="black",  # use red color on all points
+            marker_kwds=dict(radius=3, fill=True),  # make marker radius 10px with fill
+            name="Candidates",  # name of the layer in the map
+        )
+        #folium.TileLayer("CartoDB positron", show=False).add_to(m)  
+        # use folium to add alternative tiles
+        folium.LayerControl().add_to(m)  # use folium to add layer control
+
+
+        # Side by side Layers: control=False  to add a layer control to your map
+        #m = folium.Map(location=(30, 20), zoom_start=4)
+
+        #layer_right = folium.TileLayer('openstreetmap')
+        #layer_left = folium.TileLayer('cartodbpositron')
+
+        #sbs = folium.plugins.SideBySideLayers(layer_left=layer_left, layer_right=layer_right)
+
+        #layer_left.add_to(m)
+        #layer_right.add_to(m)
+        #sbs.add_to(m)
+
+        return m, regions, chicago, geo_centers 
+
+
+def plot_grid(graph):
     
-"""
-def fig_blocks(data):
-
-    data['constant']=2
+    list_nodes = list(graph.nodes)
+    #noncandidate_nodes = [item for item in list_nodes if item not in list_candidates]
     
-    fig = px.choropleth_mapbox(
-        data,
-        geojson=data.geometry.__geo_interface__,  # Make sure to convert to GeoJSON correctly
-        locations=data.index,  # Index or any unique identifier
-        color="constant",  # Use the constant column for coloring
-        color_discrete_sequence=["blue"],  # This sets the uniform color
-        mapbox_style="open-street-map",
-        center={"lat": data.geometry.centroid.y.mean(), "lon": data.geometry.centroid.x.mean()},
-        height = 800,
-        zoom=10,
-        opacity=0.2,
-        labels={'constant': 'Label here'},  # Adjust label as needed
-    )
+    node_positions = {}
+    for i in list_nodes:
+        node_positions[i]=i
+
+    nx.draw_networkx_nodes(graph, node_positions, nodelist=list_nodes, node_color="tab:blue")
     
-    return fig
-
-
-def  add_phc(fig, phc_df):
+    # edges
+    nx.draw_networkx_edges(graph, node_positions, width=1.0, alpha=0.5)
     
-    # Add the PHC locations as a new layer to the map
-    fig.add_scattermapbox(
-    lat=phc_df['lat'],
-    lon=phc_df['lon'],
-    mode='markers',
-    marker=dict(size=5, color='black'))
+    labels = {}
     
-    return fig
+    for node in graph.nodes:
+        if graph.nodes[node]["candidate"]== True:
+            labels[node] = f"C-{graph.nodes[node]["population"]}"    
+        else: 
+            labels[node]= f"{graph.nodes[node]["population"]}"
 
+    nx.draw_networkx_labels(graph, node_positions, labels, font_size=8, font_color="whitesmoke")
 
-def add_routes(chicago, routes, height):
-    
-    stops = routes['bustime-response']['ptr'][0]['pt'] 
-
-    latitudes = [stop['lat'] for stop in stops]
-    longitudes = [stop['lon'] for stop in stops]
-    hover_texts = [stop.get("stpnm", f"Stop {stop['seq']}") for stop in stops]
-    
-    fig1 = plot_census(chicago, height)
-
-
-    # Plot stops as scatter points on the map
-    fig1.add_trace(go.Scattermapbox(
-        lat=latitudes,
-        lon=longitudes,
-        mode='markers+text',  # 'markers' for points, 'text' if you want to show labels
-        marker=go.scattermapbox.Marker(size=0.1, color='white'),  # Adjust size and color as needed
-        text=hover_texts,
-        hoverinfo='text'
-    ))
-
-    # Draw lines between consecutive stops to create the route
-    fig1.add_trace(go.Scattermapbox(
-        lat=latitudes,
-        lon=longitudes,
-        mode='lines',
-        line=dict(width=2, color='red'), 
-        hoverinfo='none' 
-    ))
-
-    # Update the layout to adjust the viewport if needed
-    fig1.update_layout(
-        mapbox=dict(
-            style='open-street-map', 
-            zoom=10, 
-            center=dict(lat=sum(latitudes) / len(latitudes), lon=sum(longitudes) / len(longitudes))  # Center map on route
-        ),
-        showlegend=False
-    )
-
-    fig1.show()
-
-"""
+    pltt.tight_layout()
+    pltt.axis()
+    pltt.show()

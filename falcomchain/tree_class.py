@@ -455,8 +455,6 @@ def bipartition_tree(
 
 def capacitated_recursive_tree(
     graph: nx.Graph,
-    filtered_parts: dict,
-    n_parts: int,
     column_names: tuple[str],
     n_teams: int,
     pop_target: int,  # think about this. union of two districts may get far from average in population
@@ -468,8 +466,6 @@ def capacitated_recursive_tree(
      Recursively partitions a graph into balanced districts using bipartition_tree.
 
     :param graph: The graph to partition into ``len(parts)`` :math:`\varepsilon`-balanced parts.
-    :param filtered_parts:
-    :param n_parts:
     :param n_teams: Total number of doctor-nurse teams for all facilities.
     :param pop_target: Target population for each part of the partition.
     :param column_names: 
