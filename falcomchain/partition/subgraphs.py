@@ -32,7 +32,7 @@ class SubgraphView:
         :returns: None
         """
         self.graph = graph
-        self.parts = parts
+        self.parts = parts  # this is introduced as list of lists. I am suspicious it is not. (parts is a dict)
         self.subgraphs_cache = {}
 
     def __getitem__(self, part: int) -> Graph:

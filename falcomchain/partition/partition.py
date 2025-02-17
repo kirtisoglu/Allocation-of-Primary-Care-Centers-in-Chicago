@@ -38,6 +38,7 @@ class Partition:
     __slots__ = (
         "graph",
         "subgraphs",
+        "supergraph",
         "assignment",
         "updaters", 
         "parent",
@@ -64,7 +65,7 @@ class Partition:
         parent=None,
         flips=None,
         use_default_updaters=True,
-        column_names: Tuple[str] = None
+        column_names: Tuple[str] = None,
     ):
         """
         :param graph: Underlying graph.
@@ -169,9 +170,10 @@ class Partition:
 
         self.updaters.update(updaters)
 
-        self.travel_times = travel_times
+        self.travel_times = travel_times # do we need this as an attribute?
         self.teams = teams
-        self.capacity_level = capacity_level
+        self.capacity_level = capacity_level # create a facility class?
+        
         
         self.parent = None
         self.flips = None

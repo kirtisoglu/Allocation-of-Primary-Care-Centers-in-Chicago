@@ -1,6 +1,7 @@
 import random
 from partition import Partition
 from tree import (capacitated_recursive_tree, ReselectException)
+from partition import cut_edges, cut_edges_by_part, put_edges_into_parts
 
 
 class MetagraphError(Exception):
@@ -22,9 +23,8 @@ class ValueWarning(UserWarning):
 
 
 
-def recom( # Note: recomb is called for each state of the chain. Parameters must be static for the states.
+def recom( # Note: recomb is called for each state of the chain. Parameters must be static for the states. (should we cache some of them in Partition?)
     partition: Partition,
-    capacity_level: int,
     pop_target: int,
     column_names: tuple[str],
     epsilon: float,
@@ -56,12 +56,12 @@ def recom( # Note: recomb is called for each state of the chain. Parameters must
     """
     bad_district_pairs = set()
     n_parts = len(partition)
-    tot_pairs = n_parts * (n_parts - 1) / 2  # n choose 2
+    tot_pairs = n_parts * (n_parts - 1) / 2  # n choose 2  (isn't it too big? no adjacency between any two districts. it should be # of super cut edges)
 
     while len(bad_district_pairs) < tot_pairs:
         try:
             while True:
-                edge = random.choice(tuple(partition["cut_edges"]))
+                edge = random.choice(tuple(partition["cut_edges"])) 
                 # Need to sort the tuple so that the order is consistent in the bad_district_pairs set
                 part_one, part_two = partition.assignment.mapping[edge[0]], partition.assignment.mapping[edge[1]]
                 parts_to_merge = [part_one, part_two]
@@ -82,12 +82,12 @@ def recom( # Note: recomb is called for each state of the chain. Parameters must
                 n_teams=n_teams,
                 pop_target=pop_target,
                 epsilon=epsilon,
-                capacity_level=capacity_level,
+                capacity_level=partition.capacity_level,
                 density = density)
             break
    
         except Exception as e:
-            if isinstance(e, ReselectException):
+            if isinstance(e, ReselectException):  # if there is no balanced cut after max_attempt in bipartition_tree, then the pair is a bad district pair.
                 bad_district_pairs.add(tuple(parts_to_merge))
                 continue
             else:
@@ -100,6 +100,49 @@ def recom( # Note: recomb is called for each state of the chain. Parameters must
         )
                 
     return partition.flip(flips, new_teams)
+
+
+
+def hierarchical_recomb(partition: Partition,
+    pop_target: int,
+    column_names: tuple[str],
+    epsilon: float,
+    density: float = None,
+    supergraph: str = None,  # local or global
+) -> Partition:
+    """_summary_
+
+    Args:
+        partition (Partition): _description_
+        pop_target (int): _description_
+        column_names (tuple[str]): _description_
+        epsilon (float): _description_
+        density (float, optional): _description_. Defaults to None.
+        supergraph (str, optional): Local or global. Defaults to None.
+
+    Returns:
+        Partition: _description_
+    """
+
+    
+    bad_district_pairs = set()
+    n_parts = len(partition)
+    tot_pairs = n_parts * (n_parts - 1) / 2  # n choose 2  (isn't it too big? no adjacency between any two districts. it should be # of super cut edges)
+
+
+                
+    return partition.flip(flips, new_teams)
+    
+
+
+
+def local_multi_supergraph(partition: Partition):
+    
+    cut_edges = partition["cut_edges"]  
+    edge = random.choice(tuple(cut_edges))
+    
+    return parts_to_merge
+
 
 
 
@@ -152,67 +195,3 @@ def propose_random_flip(partition: Partition) -> Partition:
     flip = {flipped_node: partition.assignment.mapping[other_node]}
     return partition.flip(flip)
 
-
-
-
-class Supergraph:
-    """
-    Generates a supergraph of parts in a partition to pick a random set of parts that does not 
-    exceed the maximum number of teams in total. In each state, we update merged and re-splitted 
-    parts in the metagraph locally.All possible sets of possible neighboring parts are produced 
-    and one of them is uniformly selected.
-    """
-    
-    
-    def __init__(self, partition: Partition, max):
-        
-        self.nodes = set(partition.parts.keys())
-        self.neighborhood = {node: {} for node in self.nodes}
-        
-        for edge in partition.cut_edges:
-            self.neighborhood[partition.assignment.mapping[edge[0]]].add(partition.assignment.mapping[edge[1]])
-            self.neighborhood[partition.assignment.mapping[edge[1]]].add(partition.assignment.mapping[edge[0]])
-
-        self.node_subsets = self.parts_to_merge()
-        
-        sum = sum(partition.radius[part] for part in partition.radius.keys())
-        
-        def __repr__(self):
-            pass
-        
-        def parts_to_merge(self):
-            
-            return
-        
-        
-        def node_ant(self):
-            
-            return
-        
-        
-        def update_supergraph():
-            return
-
-
-
-def weigthted_selection_by_travel_time(partition: Partition):
-   
-    population = list(partition.parts.keys())
-    weight_list = [partition.radius[part] for part in population]
-
-    first_part = random.choices(population, weights=weight_list, k=1)
-        
-    return
-    
-    
-    
-def uniform_selection_from_neighborhoods(partition: Partition):
-
-    population = list(partition.parts.keys())
-
-    first_part = random.choice(population)
-    cuts = {edge for edge in partition.cut_edges if first_part in edge}
-    
-    return        
-    
-    

@@ -222,7 +222,7 @@ class Grid:
             m, n = self.dimensions
             for node in self.graph.nodes:
                 x, y = node
-                if k_1 <= x <= m - k_1 or k_2 <= y <= n - k_2:
+                if k_1 <= x < m - k_1 or k_2 <= y < n - k_2:
                     self.graph.nodes[node]['population'] = 30
                 else:
                     self.graph.nodes[node]['population'] = 70

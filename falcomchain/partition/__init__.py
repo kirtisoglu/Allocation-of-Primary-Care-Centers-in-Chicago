@@ -1,7 +1,7 @@
 from .partition import Partition, GeographicPartition
 from .assignment import *
 from .subgraphs import SubgraphView
-
+from .supergraph import Supergraph
 
 
 from .compactness import (
@@ -13,7 +13,7 @@ from .compactness import (
     perimeter,
 )
 
-from .cut_edges import cut_edges, cut_edges_by_part
+from .cut_edges import cut_edges, cut_edges_by_part, put_edges_into_parts
 from .flows import compute_edge_flows, flows_from_changes
 from .tally import DataTally, Tally
 from .spanning_trees import num_spanning_trees

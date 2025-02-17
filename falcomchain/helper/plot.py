@@ -289,29 +289,30 @@ class Plot:
 
 
 def plot_grid(graph):
-    
-    list_nodes = list(graph.nodes)
-    #noncandidate_nodes = [item for item in list_nodes if item not in list_candidates]
-    
-    node_positions = {}
-    for i in list_nodes:
-        node_positions[i]=i
 
-    nx.draw_networkx_nodes(graph, node_positions, nodelist=list_nodes, node_color="tab:blue")
-    
-    # edges
-    nx.draw_networkx_edges(graph, node_positions, width=1.0, alpha=0.5)
-    
+    list_nodes = list(graph.nodes)
+    line = []
+    node_positions = {}
     labels = {}
+    font = {}
     
-    for node in graph.nodes:
+    for node in list_nodes:
+        node_positions[node]=node
+        
         if graph.nodes[node]["candidate"]== True:
-            labels[node] = f"C-{graph.nodes[node]["population"]}"    
+            labels[node] = f"{graph.nodes[node]["population"]}"
+            line.append(1)
         else: 
             labels[node]= f"{graph.nodes[node]["population"]}"
+            line.append(0)
 
+    
+    # nx.draw_networkx_nodes(G_ex, pos, alpha=0.8, node_color=node_color_list)
+    nx.draw_networkx_nodes(graph, node_positions, nodelist=list_nodes, node_size=150, alpha=0.8, linewidths=line, edgecolors='red', node_color="tab:blue")
+    nx.draw_networkx_edges(graph, node_positions, width=1.0, alpha=0.5)
     nx.draw_networkx_labels(graph, node_positions, labels, font_size=8, font_color="whitesmoke")
 
+    fig = pltt.figure(1, figsize=(12, 6))
     pltt.tight_layout()
-    pltt.axis()
+    pltt.axis("off")
     pltt.show()

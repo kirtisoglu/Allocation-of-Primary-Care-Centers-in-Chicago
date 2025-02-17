@@ -59,8 +59,9 @@ updaters -> We use only two files here:
                 flows:
 
 Order: SingleMetricOptimizers by user -> MarkovChain by tilted_run function in SingleMetricOptimizers 
-        -> recomb function at every state by MarkovChain. Remark: parameters of recomb is defined by user, not in MarkovChain. -> capacitated_recursive_tree by recomb
-        -> bipartition_tree -> find_edge_cuts -> find_edge_cuts ->
+        -> recomb function at every state by MarkovChain. Remark: parameters of recomb is defined by user, not in MarkovChain. 
+        -> capacitated_recursive_tree by recomb
+        -> bipartition_tree -> find_edge_cuts 
 
 -----------------  OTHERS   -----------------
 
@@ -76,6 +77,7 @@ constraints
 
 metagraph.py
 
+supergraph.py
 
 
 

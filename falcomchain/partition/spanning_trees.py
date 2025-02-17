@@ -39,3 +39,6 @@ def num_spanning_trees(partition) -> Dict[int, int]:
         part: _num_spanning_trees_in_district(partition, part)
         for part in partition.parts
     }
+
+
+
