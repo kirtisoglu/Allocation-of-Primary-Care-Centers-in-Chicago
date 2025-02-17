@@ -3,14 +3,14 @@
 This project tackles the complex challenge of the capacitated facility location problem on large-scale data by using advanced optimization algorithms. We provide an efficient method for real-world scenarios with potential applications across various sectors including healthcare, retail, and public services. 
 
 Key Features:
-Integer Programming Formulation: We've developed a robust mathematical model using integer programming to represent the capacitated facility location problem with contiguous service areas.
-Markov Chain Optimization: Our solution employs an iterative Markov chain process, where each state represents a valid graph partitioning corresponding to a geographical redistricting scheme.
-A Novel Sampling Method: Inspired by the ReComb method (DeFord et al., 2019), we have created an efficient spanning tree sampling technique to explore the solution space efficiently.
-Local Search Algorithms: We have improved upon two flip-based local search algorithms, providing a benchmark for our sampling method.
-Chicago Case Study: We apply our method to a real-world scenario, optimizing the location of new primary care facilities in Chicago while reducing the healthcare access inequality via public transportation.
-Transportation Network Analysis: We have constructed a real-world transportation network and calculated travel times between candidate facility locations and Census block centroids.
-Results: Our approach yields convincing results in a short timeframe.
-Current Status: We are in the final stages of preparing our research for publication. Stay tuned for updates on our submission and findings.
+Integer Programming Formulation: We've developed a robust mathematical model using integer programming to represent the capacitated facility location problem with contiguous service areas.  
+Markov Chain Optimization: Our solution employs an iterative Markov chain process, where each state represents a valid graph partitioning corresponding to a geographical redistricting scheme.  
+A Novel Sampling Method: Inspired by the ReComb method (DeFord et al., 2019), we have created an efficient spanning tree sampling technique to explore the solution space efficiently.  
+Local Search Algorithms: We have improved upon two flip-based local search algorithms, providing a benchmark for our sampling method.  
+Chicago Case Study: We apply our method to a real-world scenario, optimizing the location of new primary care facilities in Chicago while reducing the healthcare access inequality via public transportation.  
+Transportation Network Analysis: We have constructed a real-world transportation network and calculated travel times between candidate facility locations and Census block centroids.  
+Results: Our approach yields convincing results in a short timeframe.  
+Current Status: We are in the final stages of preparing our research for publication. Stay tuned for updates on our submission and findings.  
 
 
 Data
