@@ -9,6 +9,7 @@ from .flows import compute_edge_flows, flows_from_changes
 from .assignment import get_assignment
 from .subgraphs import SubgraphView
 from graph import Graph, FrozenGraph
+from.supergraph import Supergraph
 from tree import capacitated_recursive_tree
 from helper import DataHandler
 from typing import Any, Callable, Dict, Optional, Tuple
@@ -148,6 +149,7 @@ class Partition:
         )
 
     def _first_time(self, graph, assignment, updaters, use_default_updaters, travel_times, teams, capacity_level, column_names):
+        
         if isinstance(graph, Graph):
             self.graph = FrozenGraph(graph)
         elif isinstance(graph, networkx.Graph):
@@ -170,10 +172,10 @@ class Partition:
 
         self.updaters.update(updaters)
 
-        self.travel_times = travel_times # do we need this as an attribute?
+        self.travel_times = travel_times # do we need this as an attribute? move out to _init_ so we that we don't assign it at every state.
         self.teams = teams
         self.capacity_level = capacity_level # create a facility class?
-        
+        self.supergraph = Supergraph(self.assignment)
         
         self.parent = None
         self.flips = None

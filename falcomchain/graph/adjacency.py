@@ -20,7 +20,6 @@ def neighbors(df: GeoDataFrame, adjacency: str) -> Dict:
             "The adjacency parameter provided is not supported. "
             'We support "queen" or "rook" adjacency.'
         )
-
     return adjacencies[adjacency](df.geometry)
 
 

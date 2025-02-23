@@ -5,16 +5,16 @@ from .flows import on_edge_flow, neighbor_flips
 
 def put_edges_into_parts(edges: List, assignment: Dict) -> Dict:
     """
-    :param edges: A list of edges in a graph which are to be separated
-        into their respective parts within the partition according to
-        the given assignment.
+    :param edges: A list of crossing edges in a graph which are to be 
+        separated into their respective parts within the partition 
+        according to the given assignment.
     :type edges: List
     :param assignment: A dictionary mapping nodes to their respective
         parts within the partition.
     :type assignment: Dict
 
-    :returns: A dictionary mapping each part of a partition to the set of edges
-        in that part.
+    :returns: A dictionary mapping each part of a partition to the set 
+        of crossing edges in that part.
     :rtype: Dict
     """
     by_part = collections.defaultdict(set)
