@@ -8,14 +8,13 @@ from .flows import compute_edge_flows, flows_from_changes
 
 from .assignment import get_assignment
 from .subgraphs import SubgraphView
-from graph import Graph, FrozenGraph
-from.supergraph import Supergraph
+from graph import Graph, FrozenGraph, rook
 from tree import capacitated_recursive_tree
 from helper import DataHandler
 from typing import Any, Callable, Dict, Optional, Tuple
 
-from .tally import Tally
-from .compactness import boundary_nodes, exterior_boundaries, interior_boundaries, perimeter
+from ...not_used.tally import Tally
+from ...not_used.compactness import boundary_nodes, exterior_boundaries, interior_boundaries, perimeter
 from .cut_edges import cut_edges, cut_edges_by_part
 
 
@@ -67,6 +66,8 @@ class Partition:
         flips=None,
         use_default_updaters=True,
         column_names: Tuple[str] = None,
+        merged_ids: Optional[set] = None,
+        new_ids: Optional[set] = None
     ):
         """
         :param graph: Underlying graph.
@@ -81,7 +82,7 @@ class Partition:
         if parent is None:
             self._first_time(graph, assignment, updaters, use_default_updaters, travel_times, teams, capacity_level, column_names)
         else:
-            self._from_parent(parent, flips, teams)
+            self._from_parent(parent, flips, teams, merged_ids, new_ids)
 
         self._cache = dict()
         self.subgraphs = SubgraphView(self.graph, self.parts)
@@ -134,7 +135,8 @@ class Partition:
             pop_target=pop_target,  
             epsilon=epsilon,
             capacity_level=capacity_level,
-            density=density
+            density=density,
+            ids = list(range(n_teams, 1, -1))
         )
 
         return cls(
@@ -175,7 +177,7 @@ class Partition:
         self.travel_times = travel_times # do we need this as an attribute? move out to _init_ so we that we don't assign it at every state.
         self.teams = teams
         self.capacity_level = capacity_level # create a facility class?
-        self.supergraph = Supergraph(self.assignment)
+        self.supergraph = supergraph(self)  # To much memory? 
         
         self.parent = None
         self.flips = None
@@ -184,7 +186,7 @@ class Partition:
 
       
             
-    def _from_parent(self, parent: "Partition", flips: Dict, new_teams: Dict) -> None:
+    def _from_parent(self, parent: "Partition", flips: Dict, new_teams: Dict, merged_ids, new_ids) -> None:
         self.parent = parent
         self.flips = flips
 
@@ -195,7 +197,7 @@ class Partition:
 
         self.flows = flows_from_changes(parent, self)  
 
-        self.assignment = parent.assignment.copy(self.travel_times)
+        self.assignment = parent.assignment.copy()
         self.assignment.update_flows(self.flows, self.travel_times) 
         
         self.teams = parent.teams.copy()
@@ -205,6 +207,7 @@ class Partition:
         if "cut_edges" in self.updaters:
             self.edge_flows = compute_edge_flows(self)
         
+        self.supergraph = update_supergraph(self)
         
         
 
@@ -216,7 +219,7 @@ class Partition:
     def __len__(self):
         return len(self.parts)
 
-    def flip(self, flips: Dict, new_teams: Dict) -> "Partition":
+    def flip(self, flips: Dict, new_teams: Dict, merged_ids, new_ids) -> "Partition":
         """
         Returns the new partition obtained by performing the given `flips` and new_teams.
         on this partition.
@@ -226,7 +229,7 @@ class Partition:
         
         :returns: the new :class:`Partition`
         """
-        return self.__class__(parent=self, travel_times=self.travel_times, flips=flips, teams = new_teams)
+        return self.__class__(parent=self, travel_times=self.travel_times, flips=flips, teams = new_teams, merged_ids = merged_ids, new_ids = new_ids)
 
     def crosses_parts(self, edge: Tuple) -> bool:
         """
@@ -309,7 +312,6 @@ class Partition:
     
     
 
-
 class GeographicPartition(Partition):
     """
     A :class:`Partition` with areas, perimeters, and boundary information included.
@@ -328,3 +330,78 @@ class GeographicPartition(Partition):
     }
 
 
+# Clean and move this function to Graph class?
+# Some attributes can be defined as Tally attributes
+# I may not need a spatial construction. 
+def geo_supergraph(partition: Partition) -> "Graph":
+
+    # Generate dict of dicts of dicts with shared perimeters according
+    # to the requested adjacency rule
+    from shapely import unary_union
+    handler = DataHandler()
+    chicago = handler.load_chicago()  # without loading a data?
+    geometries = chicago.geometry
+    
+    supernode_geometries = {}
+    for district, nodes in partition.parts.items():
+        supernode_geometries[district] = unary_union([geometries[node_id] for node_id in nodes])
+    
+    import geopandas as gpd
+    supernode_geometries = gpd.GeoSeries(supernode_geometries)    
+ 
+    adjacencies = rook(supernode_geometries)   #adjacencies = neighbors(df, adjacency)
+    supergraph = Graph(adjacencies)
+
+    supergraph.issue_warnings()
+
+    # Add "exterior" perimeters to the boundary nodes
+    from graph import add_boundary_perimeters
+    add_boundary_perimeters(supergraph, supernode_geometries)
+    
+    areas = supernode_geometries.area.to_dict()
+    networkx.set_node_attributes(supergraph, name="area", values=areas)
+    networkx.set_node_attributes(supergraph, name="n_teams", values=partition.teams)
+    
+    for supernode in supergraph.nodes():
+        supergraph.nodes[supernode]["pop"] = sum(partition.graph.nodes[node]['pop'] for node in partition.parts[supernode])
+        #supergraph.nodes[supernode]["centroid"] = supernode_geometries[supernode].centroid()
+        supergraph.edges[superedge]['edge_power'] = 0
+        supergraph.nodes[supernode]["n_candidates"] = len(partition.assignment.candidates[supernode])  # do we need this?
+
+    for edge in partition.cut_edges:    
+        superedge = (partition.assignment.mapping[edge[0]], partition.assignment.mapping[edge[1]])
+        supergraph.edges[superedge]['edge_power'] += 1
+        
+        return supergraph
+
+
+def update_supergraph(partition: Partition):
+    
+    # flows = {district: {"in":, "out":}}
+    
+    for supernode, moves in partition.flows.items():  
+    
+        
+        # update area 
+        partition.supergraph.nodes[supernode]["area"] += sum(partition.graph.nodes[node]['area'] for node in moves["in"]) - sum(partition.graph.nodes[node]['area'] for node in moves["out"])
+    
+    return supergraph
+
+
+        #'edge_power'  
+        #"pop"
+        #"n_teams"
+        #add_boundary_perimeters"""
+        
+        # name columns using self.pop_col, self.area_col, self.facility_col, self.density_col = self.column_names  
+        
+        
+
+    
+    
+    
+def supergraph(partition: Partition):
+    
+    
+    
+    return

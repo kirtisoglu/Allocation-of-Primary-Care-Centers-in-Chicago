@@ -1,8 +1,8 @@
 import random
 from partition import Partition
 from tree import (capacitated_recursive_tree, ReselectException)
-from partition import cut_edges, cut_edges_by_part, put_edges_into_parts
-
+from partition import cut_edges, cut_edges_by_part, put_edges_into_parts, bipartition_supertree
+from collections import deque
 
 class MetagraphError(Exception):
     """
@@ -57,7 +57,8 @@ def recom( # Note: recomb is called for each state of the chain. Parameters must
     bad_district_pairs = set()
     n_parts = len(partition)
     tot_pairs = n_parts * (n_parts - 1) / 2  # n choose 2  (isn't it too big? no adjacency between any two districts. it should be # of super cut edges)
-
+    ids = set(partition.parts.keys())
+    
     while len(bad_district_pairs) < tot_pairs:
         try:
             while True:
@@ -72,20 +73,20 @@ def recom( # Note: recomb is called for each state of the chain. Parameters must
 
             n_teams = partition.teams[part_one] + partition.teams[part_two]
             subgraph = partition.graph.subgraph(partition.parts[part_one] | partition.parts[part_two])
-            filtered_parts = {part: partition.parts[part] for part in parts_to_merge}
 
             flips, new_teams = capacitated_recursive_tree(
                 graph = subgraph.graph,
-                filtered_parts = filtered_parts,
-                n_parts = n_parts,
                 column_names = column_names,
                 n_teams=n_teams,
                 pop_target=pop_target,
                 epsilon=epsilon,
                 capacity_level=partition.capacity_level,
-                density = density)
+                density = density,
+                assignments = partition.assignment, 
+                merged_parts = parts_to_merge,
+                ids=ids)
             break
-   
+
         except Exception as e:
             if isinstance(e, ReselectException):  # if there is no balanced cut after max_attempt in bipartition_tree, then the pair is a bad district pair.
                 bad_district_pairs.add(tuple(parts_to_merge))
@@ -108,7 +109,6 @@ def hierarchical_recomb(partition: Partition,
     column_names: tuple[str],
     epsilon: float,
     density: float = None,
-    supergraph: str = None,  # local or global
 ) -> Partition:
     """_summary_
 
@@ -124,25 +124,52 @@ def hierarchical_recomb(partition: Partition,
         Partition: _description_
     """
 
-    
-    bad_district_pairs = set()
+    bad_selection = set()
     n_parts = len(partition)
-    tot_pairs = n_parts * (n_parts - 1) / 2  # n choose 2  (isn't it too big? no adjacency between any two districts. it should be # of super cut edges)
+    tot_pairs = n_parts * (n_parts - 1) / 2 
+    ids = set(partition.parts.keys())
 
-
+    while len(bad_selection) < tot_pairs:  # we need to change this to something related to supergraph
+        try:
+            while True:
+                parts_to_merge = bipartition_supertree(
+                    supergraph=partition.supergraph)
+                parts_to_merge.sort() # Need to sort the tuple so that the order is consistent in the bad_selection set
                 
-    return partition.flip(flips, new_teams)
-    
+                if tuple(parts_to_merge) not in  bad_selection:
+                    break
 
+            n_teams = sum(partition.teams[part] for part in parts_to_merge)
+            subgraph = partition.graph.subgraph(set.union(*(set(partition.parts[part]) for part in parts_to_merge)))
 
+            flips, new_teams, remaining_ids, new_ids = capacitated_recursive_tree(
+                graph = subgraph.graph,
+                column_names = column_names,
+                n_teams=n_teams,
+                pop_target=pop_target,
+                epsilon=epsilon,
+                capacity_level=partition.capacity_level,
+                density = density,
+                assignments = partition.assignment, # ??
+                merged_ids=ids, # ??
+                max_id = max_id # ??
+            )
+            break
 
-def local_multi_supergraph(partition: Partition):
-    
-    cut_edges = partition["cut_edges"]  
-    edge = random.choice(tuple(cut_edges))
-    
-    return parts_to_merge
+        except Exception as e:
+            if isinstance(e, ReselectException):  # if there is no balanced cut after max_attempt in bipartition_tree, then the pair is a bad district pair.
+                bad_selection.add(tuple(parts_to_merge))
+                continue
+            else:
+                raise
 
+    if len(bad_selection) == tot_pairs:
+        raise MetagraphError(
+            f"Bipartitioning failed for {tot_pairs} of district collections."
+            f"Consider rerunning the chain with a different random seed."
+        )
+                
+    return partition.flip(flips, new_teams, merged_ids, new_ids)
 
 
 

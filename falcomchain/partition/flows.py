@@ -23,6 +23,17 @@ def create_flow():
     return {"in": set(), "out": set()}
 
 
+
+def id_flows(merged_parts, new_ids):
+    
+    old_ids = merged_parts.difference(new_ids)  # will be removed from partition.parts.keys()
+    new_ids = new_ids.difference(merged_parts)  # will be added to partition.parts.keys()
+    id_flow = {"in": new_ids, "out":old_ids}
+        
+    return id_flow
+
+
+
 @functools.lru_cache(maxsize=2)
 def flows_from_changes(old_partition, new_partition) -> Dict:
     """
@@ -213,3 +224,5 @@ def on_edge_flow(initializer: Callable, alias: str) -> Callable:
         return wrapper
 
     return decorator
+
+

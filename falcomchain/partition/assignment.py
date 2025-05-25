@@ -86,35 +86,47 @@ class Assignment(Mapping):
         """
         return Assignment(self.parts.copy(), self.candidates.copy(), travel_times, self.mapping.copy(), validate=False)
 
-
+    
+    
     def candidate_flows(self, flow):
         print("candidates values", self.candidates.values())
         listoffrozensets = [s for s in self.candidates.values()]
         all_candidates = frozenset().union(*listoffrozensets)
         print("all candidates after union", all_candidates)
         return flow["in"] & all_candidates 
+    
+    def update_dic
      
-
-    def update_flows(self, flows, travel_times):
+    def update_flows(self, flows, id_flow, travel_times):
         """
         Update the assignment for some nodes using the given flows.
         """
+        for part in id_flow["in"]:
+            self.parts[part] = set()
+            self.candidates[part] = set()
+            self.centers[part] = set()
+            self.radius[part] = set()
+            
         for part, flow in flows.items():
-            print("part", part)
-            print("flow", flow)
-            print("parts[part]", self.parts[part])
+            #print("part", part)
+            #print("flow", flow)
+            #print("parts[part]", self.parts[part])
             # Union between frozenset and set returns an object whose type
             # matches the object on the left, which here is a frozenset
-            print("flow out", flow['out'])
-            print("flow in", flow["in"])
+            #print("flow out", flow['out'])
+            #print("flow in", flow["in"])
+                
             self.parts[part] = (self.parts[part] - flow["out"]) | flow["in"]
-            print("updated parts[part]", self.parts[part])
             self.candidates[part] = (self.candidates[part] - flow["out"]) | self.candidate_flows(flow)
             self.centers[part], self.radius[part] = self.facility_assignment(part, travel_times)
-            print("updated candidates[part]", self.candidates[part])
+            #print("updated parts[part]", self.parts[part])
+            #print("updated candidates[part]", self.candidates[part])
             for node in flow["in"]:
                 self.mapping[node] = part
+
+            self.parts[part] = set()
                 
+
                 
     def items(self):
         """

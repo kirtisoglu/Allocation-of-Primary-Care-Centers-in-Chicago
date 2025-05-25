@@ -6,10 +6,11 @@
 4. Stats:
 5. Optimization
 
-* [ ] complete recursivity
+* [X] complete recursivity
 * [ ] transportation travel times
 * [ ] code cleaning
-* [ ] Publish a library with a documentation. This is the main reason for the delay. Share it with Kaul. Mention your ideas about working with Adam.
+* [ ] message pasing, RL, Markov basis ideas
+* [ ] Publish a library with a documentation.
 
 ---
 
@@ -104,13 +105,9 @@ supergraph.py
 
 ## Graph
 
-
-
 Read and write NetworkX graphs as adjacency lists.
 
 Adjacency list format is useful for graphs without data associated with nodes or edges and for nodes that can be meaningfully represented as strings.
-
-
 
 adjacency.py: Provides a set of functions to help determine and manipulate the adjacency of geometries within a particular graph. The functions in this module are used internally to ensure that the geometry data that we are working with is sufficiently well-defined to be used.
 
@@ -139,8 +136,6 @@ add_boundary_perimeters(graph, df.geometry) function adds shared perimeter betwe
 
 Represents a graph to be partitioned, extending the :class:`networkx.Graph`.
 
-
-
 ### 👉 Supergraph
 
 A class whose instances are Graph objects.
@@ -160,7 +155,6 @@ A class whose instances are Graph objects.
 | area                  |                |                    Total areas of the polygons of districts. Node attr                    | See the tally below                           |
 | boundary_node         |      bool      | Nodes corresponding to polygons on the boundary of the union of all supernode geometries | any(node in district is a boundary node)      |
 | boundary_perim        |                |                                                                                          | Mimic Graph_from.. with Partition features  |
-| id                    |                |                                                                                          | ??                                            |
 | geometry              |                |                                                                                          | Code                                          |
 | population            |                |                                                                                          | Partition.pop                                 |
 | n_teams               |                |                                                                                          | Partition.teams                               |
@@ -168,9 +162,6 @@ A class whose instances are Graph objects.
 | Travel or density?    |                |                                                                                          |                                               |
 
 - Should we use Tally for some of them rather then storing as node attributes? See all updaters.
-
-
-
 
 Class Functions
 
@@ -184,7 +175,6 @@ Class Functions
 - Call from_partition(Partition) in Supergraph
 
 Then why do we need a Supergraph instance? Create it in Graph directly? Some attributes such as edge_power!
-
 
 Since we use GeographicPartition(Partition), we calculate the following for every partition.
 

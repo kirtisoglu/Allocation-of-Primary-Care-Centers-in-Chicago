@@ -2,7 +2,7 @@ import collections
 import math
 import warnings
 
-from .flows import flows_from_changes, on_flow
+from ..falcomchain.partition.flows import flows_from_changes, on_flow
 from typing import Dict, Union, List, Optional, Type
 import pandas
 
