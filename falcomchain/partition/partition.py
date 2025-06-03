@@ -4,7 +4,7 @@ import folium
 import folium.plugins
 
 from .cut_edges import cut_edges 
-from .flows import compute_edge_flows, flows_from_changes
+from .flows import compute_edge_flows, flows_from_changes, id_flows
 
 from .assignment import get_assignment
 from .subgraphs import SubgraphView
@@ -43,7 +43,8 @@ class Partition:
         "updaters", 
         "parent",
         "flips",
-        "flows",  
+        "flows", 
+        "id_flow", 
         "edge_flows", 
         "_cache",
         "travel_times",
@@ -182,6 +183,7 @@ class Partition:
         self.parent = None
         self.flips = None
         self.flows = None
+        self.id_flow = None
         self.edge_flows = None
 
       
@@ -194,11 +196,15 @@ class Partition:
         self.updaters = parent.updaters
         self.travel_times = parent.travel_times
         self.capacity_level = parent.capacity_level
+        self.merged_parts = merged_ids
+        self.new_ids
 
-        self.flows = flows_from_changes(parent, self)  
-
+    
+        self.flows = flows_from_changes(parent, self) 
+        self.id_flow = id_flows(self.merged_parts, self.new_ids) 
+        
         self.assignment = parent.assignment.copy()
-        self.assignment.update_flows(self.flows, self.travel_times) 
+        self.assignment.update_flows(self.flows, self.id_flow, self.travel_times) 
         
         self.teams = parent.teams.copy()
         for part in new_teams:

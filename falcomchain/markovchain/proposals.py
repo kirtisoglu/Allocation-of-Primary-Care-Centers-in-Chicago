@@ -1,7 +1,7 @@
 import random
 from partition import Partition
 from tree import (capacitated_recursive_tree, ReselectException)
-from partition import cut_edges, cut_edges_by_part, put_edges_into_parts, bipartition_supertree
+from partition import cut_edges, cut_edges_by_part, bipartition_supertree
 from collections import deque
 
 class MetagraphError(Exception):

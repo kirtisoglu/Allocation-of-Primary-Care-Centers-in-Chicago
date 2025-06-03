@@ -1,3 +1,21 @@
+## Functions
+
+# neighbot_flips(partition) -> Set[Tuple]: The set of edges that were flipped in the given partition. Uses only partition.flips
+# create_flow(): helper fuction which returns a dict {"in": set(), "out: set()"
+# id_flows(merged_parts, new_ids): similar to create flow, this function creates a flow dictionary but for district ids.
+# flows_from_changes(old_partition, new_partition) -> Dict: Mmapping each node that changed assignment between the previous and 
+#        current partitions to a dictionary of the form `{'in': <set of nodes that flowed in>, 'out': <set of nodes that flowed out>}`
+# on_flow(initializer, alias) -> : A decorator to create an updater that responds to flows of nodes between parts of the partition. Uses only flows.
+# compute_edge_flow(partition) -> Dict: A flow dictionary containing the flow from the parent of this partition to this partition. 
+#        Uses neighbor_flips. Used for calculating cut edges in Partition class.
+# on_edge_flow() -> :
+
+
+# Note: Flips contains nodes that are assigned to the same district either. All nodes in a redrawn districts are saved in the flip.
+
+# UPDATE compute_edge_flow and on_flow for changes in district names
+
+
 import collections
 import functools
 from typing import Dict, Set, Tuple, Callable
@@ -23,7 +41,6 @@ def create_flow():
     return {"in": set(), "out": set()}
 
 
-
 def id_flows(merged_parts, new_ids):
     
     old_ids = merged_parts.difference(new_ids)  # will be removed from partition.parts.keys()
@@ -33,11 +50,10 @@ def id_flows(merged_parts, new_ids):
     return id_flow
 
 
-
 @functools.lru_cache(maxsize=2)
 def flows_from_changes(old_partition, new_partition) -> Dict:
     """
-    :param old_partition: A partition of a Graph representing the previous step.
+    :param old_partition: A partition of a Graph representing dz    the previous step.
     :type old_partition: :class:`~gerrychain.partition.Partition`
     :param new_partition: A partition of a Graph representing the current step.
     :type new_partition: :class:`~gerrychain.partition.Partition`
@@ -224,5 +240,6 @@ def on_edge_flow(initializer: Callable, alias: str) -> Callable:
         return wrapper
 
     return decorator
+
 
 

@@ -1,3 +1,17 @@
+
+## Functions
+
+# put_edges_into_parts: {district: set of outgoing edges} - does not call any function - not used anywhere
+# new_cuts: set of cut edges that were not cut, but now are - calls crosses_parts, neighbor_flips - used in cut_edges
+# obsolete_cuts:
+# initialize_cut_edges
+# cut_edges_by_part
+# cut_edges
+#
+#
+#
+
+
 import collections
 from typing import Dict, List, Set, Tuple
 from .flows import on_edge_flow, neighbor_flips

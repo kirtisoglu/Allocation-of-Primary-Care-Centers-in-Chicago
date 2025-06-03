@@ -454,96 +454,6 @@ def bipartition_tree(
     raise RuntimeError(f"Could not find a possible cut after {max_attempts} attempts.")
 
 
-# we do not use  this 
-def old_capacitated_recursive_tree(
-    graph: nx.Graph,
-    column_names: tuple[str],
-    n_teams: int,
-    pop_target: int,  # think about this. union of two districts may get far from average in population
-    epsilon: float,
-    capacity_level: int,
-    density: float = None,
-) -> Dict:
-    """
-     Recursively partitions a graph into balanced districts using bipartition_tree.
-
-    :param graph: The graph to partition into ``len(parts)`` :math:`\varepsilon`-balanced parts.
-    :param filtered_parts:
-    :param n_parts:
-    :param n_teams: Total number of doctor-nurse teams for all facilities.
-    :param pop_target: Target population for each part of the partition.
-    :param column_names: 
-    :param epsilon: How far (as a percentage of ``pop_target``) from ``pop_target`` the parts of the partition can be.
-    :param capacity_level: The maximum number of doctor-nurse teams in a facility, If it is 1, n_teams many districts are created.
-    :param initial_solution: States if the function is running for an initial solution. Default is `False`.
-    :param density: Defaluts to None.
-
-    :returns: New assignments for the nodes of ``graph``.
-    :rtype: dict
-    """
-    flips = {}  # maps nodes to their districts
-    teams = {}  # maps districts to their number of teams
-    remaining_nodes = set(graph.nodes())
-    remaining_teams = n_teams
-    debt = 0
-    district = 1
-    # We keep a running tally of deviation from ``epsilon`` at each partition
-    # and use it to tighten the population constraints on a per-partition
-    # basis such that every partition, including the last partition, has a
-    # population within +/-``epsilon`` of the target population.
-    # For instance, if district n's population exceeds the target by 2%
-    # with a +/-2% epsilon, then district n+1's population should be between
-    # 98% of the target population and the target population.
-    #"Change  this later"
-    # Capacity level update: We multiply min_pop and max_pop by capacity level of a 
-    # district to set its population target correctly. This enlarges error bounds
-    # for districts with high population densities. 
-        
-
-    while remaining_nodes: 
-            
-        min_pop = max(pop_target * (1 - epsilon), pop_target * (1 - epsilon) - debt) 
-        max_pop = min(pop_target * (1 + epsilon), pop_target * (1 + epsilon) - debt) 
-        new_pop_target = (min_pop + max_pop) / 2
-        
-        two_sided = remaining_teams <= 2 * capacity_level  # If True ....
-        
-        try:
-            cut_object = bipartition_tree(
-                graph.subgraph(remaining_nodes),
-                column_names=column_names,
-                pop_target=new_pop_target, 
-                capacity_level=capacity_level,
-                n_teams=remaining_teams,
-                epsilon=(max_pop - min_pop) / (2 * new_pop_target),
-                density=density,
-                two_sided=two_sided,
-            )
-        except Exception:
-            raise
-        
-        if cut_object.subset is None:
-            raise BalanceError()
-        
-        hired_teams = cut_object.assigned_teams # number of teams hired for 'nodes'
-        teams[district] = hired_teams
-    
-        debt += cut_object.pop / hired_teams - pop_target  # unit debt
-        remaining_teams -= hired_teams
-        
-        if remaining_teams == 0:
-            flips.update({node: district for node in remaining_nodes})
-            remaining_nodes = set()
-        else:
-            remaining_nodes -= cut_object.subset
-            flips.update({node: district for node in cut_object.subset})
-            
-        print(f"Created district {district}")
-        district += 1
-
-
-    return flips, teams
-
 
 def determine_district_id(ids, max_id, assignments, district_nodes):
     """
@@ -652,7 +562,7 @@ def capacitated_recursive_tree(
         except Exception:
             raise
         
-        hired_teams = cut_object.assigned_teams # number of teams hired for districts
+        hired_teams = cut_object.assigned_teams # number of r\
         district_nodes = cut_object.subset
         
         # check if we are still in an epsilon range of pop_target
@@ -784,7 +694,6 @@ def bipartition_supertree(
 
 
 # spanningtree
-# update supergraph, 
+# update supergraph
            
-# check district names in flows (do we remove empty districts?)
 # connect hierarchical_recomb

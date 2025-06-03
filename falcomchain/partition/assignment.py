@@ -86,35 +86,41 @@ class Assignment(Mapping):
         """
         return Assignment(self.parts.copy(), self.candidates.copy(), travel_times, self.mapping.copy(), validate=False)
 
+
+    def add_districts(self, id_flow):
+        
+        for id in id_flow["in"]:
+            self.parts[id] = set()
+            self.candidates[id] = set()
+            self.centers[id] = set() 
+            self.radius[id] = set()
+        
+    
+    def remove_districts(self, id_flow):
+        
+        for id in id_flow["out"]:
+            self.parts.pop(id, None)
+            self.candidates.pop(id, None)
+            self.centers.pop(id, None)
+            self.radius.pop(id, None)
+            
+        return
     
     
     def candidate_flows(self, flow):
-        print("candidates values", self.candidates.values())
         listoffrozensets = [s for s in self.candidates.values()]
         all_candidates = frozenset().union(*listoffrozensets)
-        print("all candidates after union", all_candidates)
         return flow["in"] & all_candidates 
     
-    def update_dic
+
      
     def update_flows(self, flows, id_flow, travel_times):
         """
         Update the assignment for some nodes using the given flows.
         """
-        for part in id_flow["in"]:
-            self.parts[part] = set()
-            self.candidates[part] = set()
-            self.centers[part] = set()
-            self.radius[part] = set()
+        self.add_districts(id_flow)   
             
         for part, flow in flows.items():
-            #print("part", part)
-            #print("flow", flow)
-            #print("parts[part]", self.parts[part])
-            # Union between frozenset and set returns an object whose type
-            # matches the object on the left, which here is a frozenset
-            #print("flow out", flow['out'])
-            #print("flow in", flow["in"])
                 
             self.parts[part] = (self.parts[part] - flow["out"]) | flow["in"]
             self.candidates[part] = (self.candidates[part] - flow["out"]) | self.candidate_flows(flow)
@@ -124,7 +130,7 @@ class Assignment(Mapping):
             for node in flow["in"]:
                 self.mapping[node] = part
 
-            self.parts[part] = set()
+
                 
 
                 
@@ -195,7 +201,8 @@ class Assignment(Mapping):
 
         return cls(parts, candidates, travel_times)
 
-    def facility_assignment(self, part, travel_times):
+
+    def facility_assignment(self, part, travel_times): # might be cheaper if we calculate for only flow
     
         save_candidates_radius = {}
 
