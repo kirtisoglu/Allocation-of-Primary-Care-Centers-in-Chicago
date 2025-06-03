@@ -197,7 +197,7 @@ class Partition:
         self.travel_times = parent.travel_times
         self.capacity_level = parent.capacity_level
         self.merged_parts = merged_ids
-        self.new_ids
+        self.new_ids = new_ids
 
     
         self.flows = flows_from_changes(parent, self) 
@@ -271,6 +271,10 @@ class Partition:
     @property
     def parts(self):
         return self.assignment.parts
+    
+    @property
+    def teams(self):
+        return self.assignment.teams
     
     @property
     def candidates(self):
@@ -381,33 +385,36 @@ def geo_supergraph(partition: Partition) -> "Graph":
         return supergraph
 
 
+# name columns using self.pop_col, self.area_col, self.facility_col, self.density_col = self.column_names
+# skipped updating add_boundary_perimeters
 def update_supergraph(partition: Partition):
     
-    # flows = {district: {"in":, "out":}}
+    supergraph = partition.supergraph.copy()
     
-    for supernode, moves in partition.flows.items():  
+    for district in partition.merged_parts:
+        supergraph.remove_node(district)
     
-        
-        # update area 
-        partition.supergraph.nodes[supernode]["area"] += sum(partition.graph.nodes[node]['area'] for node in moves["in"]) - sum(partition.graph.nodes[node]['area'] for node in moves["out"])
+    for district in partition.new_ids:
+        pop = sum(partition.graph[node]["pop"] for node in partition.parts[district])
+        area = sum(partition.graph[node]["area"] for node in partition.parts[district])
+        supergraph.add_node(district, pop=pop, area=area, n_teams=partition.teams[district])
+    
+    for edge in partition["cut_edges"]:  # might be shorthened by using edge_flows
+        supernode_1 = partition.assignment.mapping[edge[0]]
+        supernode_2 = partition.assignment.mapping[edge[1]]
+        if (supernode_1, supernode_2) not in supergraph.edges():
+            supergraph.add_edge(supernode_1, supernode_2, edge_power=1)
+        else:
+            supergraph.edges[(supernode_1, supernode_2)]["edge_power"] += 1
     
     return supergraph
 
 
-        #'edge_power'  
-        #"pop"
-        #"n_teams"
-        #add_boundary_perimeters"""
-        
-        # name columns using self.pop_col, self.area_col, self.facility_col, self.density_col = self.column_names  
-        
-        
-
-    
-    
+          
+               
     
 def supergraph(partition: Partition):
     
-    
+    # without using geo data
     
     return

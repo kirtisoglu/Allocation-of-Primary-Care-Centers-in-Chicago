@@ -87,13 +87,14 @@ class Assignment(Mapping):
         return Assignment(self.parts.copy(), self.candidates.copy(), travel_times, self.mapping.copy(), validate=False)
 
 
-    def add_districts(self, id_flow):
+    def add_districts(self, id_flow):  # see the types of attributes
         
         for id in id_flow["in"]:
             self.parts[id] = set()
             self.candidates[id] = set()
-            self.centers[id] = set() 
-            self.radius[id] = set()
+            self.centers[id] = set()   
+            self.radius[id] = None
+            self.teams[id] = None
         
     
     def remove_districts(self, id_flow):
@@ -103,6 +104,7 @@ class Assignment(Mapping):
             self.candidates.pop(id, None)
             self.centers.pop(id, None)
             self.radius.pop(id, None)
+            self.teams.pop(id, None)
             
         return
     

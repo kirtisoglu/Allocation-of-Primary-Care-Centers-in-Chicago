@@ -13,7 +13,7 @@
 
 # Note: Flips contains nodes that are assigned to the same district either. All nodes in a redrawn districts are saved in the flip.
 
-# UPDATE compute_edge_flow and on_flow for changes in district names
+# CHECK compute_edge_flow and on_flow for changes in district names
 
 
 import collections
@@ -163,7 +163,7 @@ def compute_edge_flows(partition) -> Dict:
             edge_flows[old_target]["out"].add(edge)
             edge_flows[old_source]["out"].add(edge)
         elif cut and not was_cut:
-            edge_flows[new_target]["in"].add(edge)
+            edge_flows[new_target]["in"].add(edge)  
             edge_flows[new_source]["in"].add(edge)
         elif cut and was_cut:
             # If an edge was cut and still is cut, we need to make sure the
