@@ -42,16 +42,13 @@ from typing import (
     Tuple,
 )
 import time
-from helper import DataHandler
 
-def plot_map(assignment, attr):
+
+def plot_map(chicago, geo_centers, assignment, attr):
     import folium
     import matplotlib
     import mapclassify
 
-    handler = DataHandler()
-    chicago = handler.load_chicago()
-    geo_centers = handler.load_geo_centers()  ## Define a function for that
 
     chicago[attr] = [assignment[node] for node in chicago.index]
     regions = chicago.dissolve(by=attr, as_index=False)
@@ -127,7 +124,7 @@ class SpanningTree:
 
        
     __slots__ = ('graph', 'root', 'pop_col', 'area_col', 'facility_col', 'density_col', 'ideal_pop', 'n_teams', 
-                 'capacity_level', 'epsilon', 'successors', 'tot_pop')
+                 'capacity_level', 'epsilon', 'successors', 'tot_pop', 'supertree', 'two_sided', 'tot_candidates')
 
     def __init__(self,
                  graph, 
@@ -140,51 +137,59 @@ class SpanningTree:
                  supergraph: Optional[bool]=False
                  ) -> None:            
         
-        # Do we really need to define the following lines?
+
+        self.supertree = supergraph
         self.graph = graph
         self.pop_col, self.area_col, self.facility_col, self.density_col = column_names  # direk isimlerini gecebiliriz. Sonradan dene.
         self.ideal_pop =ideal_pop
         self.root = random.choice(list(node for node in self.graph.nodes if self.graph.degree(node) > 1))
         self.n_teams, self.capacity_level, self.epsilon = n_teams, capacity_level, epsilon
+        self.two_sided = two_sided
         
-        self.tot_pop = self.graph.nodes[self.root][self.pop_col]
+        # if we do this before, can we speed up the algorithm significantly?
+        self.tot_candidates = 0
+        for node in self.graph.nodes:
+            if self.graph.nodes[node][self.facility_col]==True:
+                self.graph.nodes[node][self.facility_col] = 1
+                self.tot_candidates += 1
+            else:
+                self.graph.nodes[node][self.facility_col] = 0
         
-        if two_sided:
-            attr = nx.get_node_attributes(self.graph, self.facility_col, default=None)
-            nx.set_node_attributes(self.graph, attr, "facility_copy")
-        
-        if supergraph == False:
-            self.successors = self.find_successors()
-            self.accumulate_tree(self.graph)  # since we do not need to accumulate supergraph all the way up, this function is unnecessarily expensive
-    
+        if self.supertree == True:
+            accumulation_columns = {self.pop_col, self.area_col, self.team_col} 
         else:
-        
-            #'edge_power'  
-            #"pop"
-            #"centroiod"
-            #"n_teams"
-            #"area"
-            #add_boundary_perimeters
-            # n_candidates"""
+            accumulation_columns = {self.pop_col, self.area_col, self.facility_col}
+
+        self.successors = self.find_successors()
+        accumulate_tree(self, accumulation_columns)  
+        self.tot_pop = self.graph.nodes[self.root][self.pop_col]
+
     
     def find_successors(self) -> Dict:
         return {a: b for a, b in nx.bfs_successors(self.graph, self.root)}
 
-    def has_ideal_pop(self):
-        "Checks if subtree beneath a node has an ideal population within the spanning tree up to epsilon."
-        return
- 
+    def has_ideal_pop(self, node, assign_team):
+        return abs(self.graph.nodes[node][self.pop_col] - assign_team * self.ideal_pop) <= self.ideal_pop * assign_team * self.epsilon
+    
+    
+    def complement_has_the_ideal_pop(self, node, assign_team):
+        return abs((self.tot_pop - self.graph.nodes[node][self.pop_col]) - assign_team * self.ideal_pop) <= self.ideal_pop * assign_team * self.epsilon
+    
+    def complement_has_ideal_pop_too(self, node, assign_team):
+        return abs((self.tot_pop - self.graph.nodes[node][self.pop_col]) - (self.n_teams - assign_team) * self.ideal_pop) <= self.ideal_pop * (self.n_teams - assign_team) * self.epsilon
+    
     def has_ideal_density(self, node):
         " Checks if the subtree beneath a node has an ideal density up to tolerance 'density'."
         return 
 
     def has_facility(self, node):
-        return self.graph.nodes[node][self.facility_col]
+        return self.graph.nodes[node][self.facility_col] > 0
     
-    def complement_has_facility(self, part_nodes):
-        complement_nodes = set(self.graph.nodes) - part_nodes
-        return any(self.graph.nodes[node]["facility_copy"] for node in complement_nodes)
- 
+    def complement_has_facility(self, node):
+        return self.graph.nodes[node][self.facility_col] < self.tot_candidates
+
+    def remarkable_nodes(self):
+        return {node: data for node, data in self.graph.nodes(data=True) if  data[self.pop_col] > 2*self.ideal_pop/3}
  
 # Tuple that is used in the find_balanced_edge_cuts function
 Cut = namedtuple("Cut", "subset assigned_teams pop")
@@ -195,30 +200,30 @@ Cut.assigned_teams.__doc__ = "The number of doctor-nurse teams for the subtree b
 Cut.pop.__doc__ = "Total population of nodes in Cut.subset"
 
 
-def accumulate_tree(tree: SpanningTree):
+def accumulate_tree(tree: SpanningTree, accumulation_columns):
         """
         Accumulates population, area and facility attributes for the subtree under 
         each node by traversing the graph using a depth-first search.
         return: None
         """
         accumulated = set()
-        stack = deque([(tree.root)]) 
+        stack = deque([(tree.root)])
 
         while stack:
             node = stack.pop()
             children = tree.successors.get(node, [])
             if all(c in accumulated for c in children): # all children are processed, accumulate attributes from children to node
-                tree.graph.nodes[node][tree.facility_col] |= any(tree.graph.nodes[c][tree.facility_col] for c in children)
-                tree.graph.nodes[node][tree.pop_col] += sum(tree.graph.nodes[c][tree.pop_col] for c in children)
-                tree.graph.nodes[node][tree.area_col] += sum(tree.graph.nodes[c][tree.area_col] for c in children)
-                accumulated.add(node)  
+                for column in accumulation_columns:
+                    tree.graph.nodes[node][column] += sum(tree.graph.nodes[c][column] for c in children)
+                accumulated.add(node)      
             else:
                 stack.append(node)
                 for c in children:
                     if c not in accumulated: 
                         stack.append(c)
-        return 
-    
+
+
+
 
 class BipartitionWarning(UserWarning):
     """
@@ -331,11 +336,75 @@ def _part_nodes(successors, start):
         return nodes
 
 
+
+def compute_subtree_nodes(tree, succ, root) -> Dict:
+    """
+    Precompute subtree nodes for all nodes.
+    Returns a dict: node -> set of nodes in the subtree rooted at node.
+    """
+    subtree_nodes = {}
+
+    def dfs(node):
+        nodes_set = {node}
+        for child in succ.get(node, []):
+            nodes_set.update(dfs(child))
+        subtree_nodes[node] = nodes_set
+        return nodes_set
+
+    dfs(root)
+    return subtree_nodes
+
+
 """  ------------------------------ Main Functions ------------------------------  """
 
  
+def find_edge_cuts(h: SpanningTree, density_check = None) -> List[Cut]:
+    """
+    This function takes a SpanningTree object as input and returns a list of balanced edge cuts. 
+    A balanced edge cut is defined as a cut that divides the graph into two subsets, such that 
+    the population of each subset is close to the ideal population defined by the SpanningTree object.
 
-def find_edge_cuts(h: SpanningTree, two_sided: Optional[bool] = False, density_check = None) -> List[Cut]:
+    :param h: The SpanningTree object representing the graph.
+    :param add_root: If set to True, an artifical node is connected to root and edge is considered as a possible cut.
+    
+    :returns: A list of balanced edge cuts.
+    """
+    cuts = []
+    nodes = h.graph.nodes
+    
+    print("--------------iteration starts")
+    print("remaining pop", h.tot_pop)
+    for node in nodes:
+        pop = nodes[node][h.pop_col]
+        print(f"pop of selected node:{pop}")
+        
+        if nodes[node][h.facility_col]>0:  # if there is a facility in the cumulative subtree
+            
+            if h.two_sided:
+                if node == h.root or h.complement_has_facility(node):
+                    for assign_team in range(1, min(h.capacity_level + 1, h.n_teams + 1)): 
+                        if h.has_ideal_pop(node, assign_team):
+                            if node == h.root or h.complement_has_ideal_pop_too(node, assign_team):
+                                cuts.append(Cut(subset=frozenset(_part_nodes(h.successors, node)), 
+                                                assigned_teams=assign_team, pop=pop))                
+            else:
+                for assign_team in range(1, min(h.capacity_level + 1, h.n_teams + 1)):  
+                    if h.has_ideal_pop(node, assign_team):
+                        cuts.append(Cut(subset=frozenset(_part_nodes(h.successors, node)), assigned_teams=assign_team, pop=pop))
+                    elif h.complement_has_the_ideal_pop(node, assign_team):  # for same node, both can be true and we add it twice!!!
+                        if h.complement_has_facility(node):
+                            cuts.append(Cut(subset=frozenset(set(nodes) - _part_nodes(h.successors, node)), 
+                                            assigned_teams=assign_team, pop=(h.tot_pop - pop)))
+
+    print("ideal pop", h.ideal_pop)
+    print("epsilon", h.epsilon)
+    print("root pop", nodes[h.root][h.pop_col])
+    print("root facility", nodes[h.root][h.facility_col])
+    print("--------------iteration ends")    
+    return cuts
+
+
+def find_superedge_cuts(h: SpanningTree, density_check = None) -> List[Cut]: # always two-sided
     """
     This function takes a SpanningTree object as input and returns a list of balanced edge cuts. 
     A balanced edge cut is defined as a cut that divides the graph into two subsets, such that 
@@ -348,53 +417,18 @@ def find_edge_cuts(h: SpanningTree, two_sided: Optional[bool] = False, density_c
     """
     cuts = []
     nodes = h.graph.nodes
-    facility_valid = 0
-    plus_pop_valid = 0
-    plus_complement_pop_valid_or_root = 0
-    complement_facility_valid_or_root = 0
-    
-    only_pop_valid = 0
-    print("--------------iteration starts")
-    print("remaining pop", h.tot_pop)
+
     for node in nodes:
-        for assign_team in range(1, min(h.capacity_level + 1, h.n_teams + 1)):
+        teams = nodes[node][h.team_col]
+        if  teams <= 2*h.capacity_level:
             pop = nodes[node][h.pop_col]
-            if nodes[node][h.facility_col]:  # if there is a facility in the cumulative subtree
-                facility_valid += 1
-                part_nodes = _part_nodes(h.successors, node)
-                if two_sided:
-                    if node == h.root or h.complement_has_facility(part_nodes):
-                        complement_facility_valid_or_root += 1
-                        if abs(pop - assign_team * h.ideal_pop) <= h.ideal_pop * assign_team * h.epsilon:
-                            plus_pop_valid += 1
-                            if node == h.root or abs((h.tot_pop - pop) - (h.n_teams - assign_team) * h.ideal_pop) <= h.ideal_pop * (h.n_teams - assign_team) * h.epsilon:
-                                plus_complement_pop_valid_or_root += 1
-                                cuts.append(Cut(subset=frozenset(part_nodes), assigned_teams=assign_team, pop=pop))
-                if not two_sided:         
-                    if abs(pop - assign_team * h.ideal_pop) <= h.ideal_pop * assign_team * h.epsilon:
-                        plus_pop_valid += 1
-                        cuts.append(Cut(subset=frozenset(part_nodes), assigned_teams=assign_team, pop=pop))
-                    elif abs((h.tot_pop - pop) - assign_team * h.ideal_pop) <= h.ideal_pop * assign_team * h.epsilon:  # for same node, both can be true and we add it twice!!!
-                        plus_pop_valid += 1 
-                        cuts.append(Cut(subset=frozenset(set(nodes) - part_nodes), assigned_teams=assign_team, pop=(h.tot_pop - pop)))
-            else:
-                if abs(pop - assign_team * h.ideal_pop) <= h.ideal_pop * assign_team * h.epsilon:
-                    only_pop_valid += 1
-                elif abs((h.tot_pop - pop) - assign_team * h.ideal_pop) <= h.ideal_pop * assign_team * h.epsilon:
-                    only_pop_valid += 1
-    print("number of facility valid nodes", facility_valid)
-    print("number of pop and facility valid nodes", plus_pop_valid)
-    print("only pop valid", only_pop_valid)
-    print("ideal pop", h.ideal_pop)
-    print("epsilon", h.epsilon)
-    print("root pop", nodes[h.root][h.pop_col])
-    print("root facility", nodes[h.root][h.facility_col])
-    print("complement facility valid or root", complement_facility_valid_or_root)
-    print("plus complement pop vali or root", plus_complement_pop_valid_or_root)
-    print("--------------iteration ends")    
+
+            if abs(pop - teams * h.ideal_pop) <= h.ideal_pop * teams * h.epsilon:
+                if node == h.root or abs((h.tot_pop - pop) - (h.n_teams - teams) * h.ideal_pop) <= h.ideal_pop * (h.n_teams - teams) * h.epsilon:
+                    parts_to_merge = _part_nodes(h.successors, node)
+                    cuts.append(Cut(subset=frozenset(parts_to_merge), assigned_teams=teams, pop=pop))
     
     return cuts
-
 
 
 def bipartition_tree(
@@ -405,6 +439,7 @@ def bipartition_tree(
     capacity_level: int,
     n_teams: int,
     two_sided: bool,
+    supergraph: bool,
     density: Optional[float] = None,
     max_attempts = 5000,
     allow_pair_reselection: bool = False # do we need this?
@@ -437,9 +472,12 @@ def bipartition_tree(
         spanning_tree = random_spanning_tree(graph) 
 
         h = SpanningTree(graph=spanning_tree, ideal_pop=pop_target, epsilon=epsilon, n_teams=n_teams, 
-                         capacity_level=capacity_level, column_names=column_names, two_sided=two_sided) 
-        
-        possible_cuts = find_edge_cuts(h, two_sided=two_sided)
+                         capacity_level=capacity_level, column_names=column_names, two_sided=two_sided, supergraph=supergraph) 
+       
+        if h.supertree == False:
+            possible_cuts = find_edge_cuts(h)
+        else:
+            possible_cuts = find_superedge_cuts(h)
         
         if possible_cuts:
             return random.choice(possible_cuts)
@@ -450,8 +488,8 @@ def bipartition_tree(
             f"Failed to find a balanced cut after {max_attempts} attempts.\n"
             f"Selecting a new district pair."
         )
-
     raise RuntimeError(f"Could not find a possible cut after {max_attempts} attempts.")
+
 
 
 
@@ -490,8 +528,6 @@ def determine_district_id(ids, max_id, assignments, district_nodes):
 
 
 
-
-
 def capacitated_recursive_tree(
     graph: nx.Graph,
     column_names: tuple[str],
@@ -499,6 +535,7 @@ def capacitated_recursive_tree(
     pop_target: int,  # think about this. union of two districts may get far from average in population
     epsilon: float,
     capacity_level: int,
+    supergraph: Optional[bool] = False,
     density: float = None,
     assignments: Optional[dict] = None,
     merged_ids: Optional[set] = None,
@@ -506,7 +543,7 @@ def capacitated_recursive_tree(
     """
      Recursively partitions a graph into balanced districts using bipartition_tree.
 
-    :param graph: The graph to partition into ``len(parts)`` :math:`\varepsilon`-balanced parts.
+    :param graph: The graph to partition into ``len(parts)`` :math:`epsilon`-balanced parts.
     :param filtered_parts:
     :param n_parts:
     :param n_teams: Total number of doctor-nurse teams for all facilities.
@@ -523,7 +560,7 @@ def capacitated_recursive_tree(
     """
     
     flips = {}  # maps nodes to their districts
-    teams = {}  # maps districts to their number of teams
+    team_flips = {}  # maps districts to their number of teams
     new_ids = set()
     remaining_ids = merged_ids
     remaining_nodes = set(graph.nodes())
@@ -557,8 +594,9 @@ def capacitated_recursive_tree(
                 capacity_level=capacity_level,
                 n_teams=remaining_teams,
                 epsilon=(max_pop - min_pop) / (2 * new_pop_target),
-                density=density,
-                two_sided=two_sided,)
+                two_sided=two_sided,
+                supergraph=supergraph,
+                density=density)
         except Exception:
             raise
         
@@ -566,8 +604,8 @@ def capacitated_recursive_tree(
         district_nodes = cut_object.subset
         
         # check if we are still in an epsilon range of pop_target
-        if district_nodes:
-            raise BalanceError()
+        #if district_nodes:
+        #    raise BalanceError()
         
         
         # determine district id
@@ -578,13 +616,13 @@ def capacitated_recursive_tree(
             district, remaining_ids, max_id = determine_district_id(remaining_ids, max_id, assignments, district_nodes)
         
         # assign number of hired teams to the district        
-        teams[district] = hired_teams
+        team_flips[district] = hired_teams
         
         # updates for the next iteration
         debt += cut_object.pop / hired_teams - pop_target  # unit debt
         remaining_teams -= hired_teams
         
-        # I don't like this. Think about it.
+        # I don't like this. Think about it. If we check epsilon range of pop_target here, we will not need this.
         if remaining_teams == 0:
             flips.update({node: district for node in remaining_nodes})
             remaining_nodes = set()
@@ -593,107 +631,8 @@ def capacitated_recursive_tree(
             remaining_nodes -= cut_object.subset
             flips.update({node: district for node in cut_object.subset})
         
-        new_ids.add(district)
+        new_ids.add(district) 
         print(f"Created district {district}")
 
-    return flips, teams, new_ids
+    return flips, team_flips, new_ids
 
-
-
-def accumulate_supertree(tree: SpanningTree):
-        """
-        Accumulates population, area and facility attributes for the subtree under 
-        each node by traversing the graph using a depth-first search.
-        return: None
-        """
-        accumulated = set()
-        stack = deque([(tree.root)]) 
-
-        while stack:
-            node = stack.pop()
-            children = tree.successors.get(node, [])
-            if all(c in accumulated for c in children): # all children are processed, accumulate attributes from children to node
-                tree.graph.nodes[node][tree.pop_col] += sum(tree.graph.nodes[c][tree.pop_col] for c in children)
-                tree.graph.nodes[node][tree.area_col] += sum(tree.graph.nodes[c][tree.area_col] for c in children)
-                tree.graph.nodes[node][tree.team_col] += sum(tree.graph.nodes[c][tree.team_col] for c in children)
-                accumulated.add(node)  
-            else:
-                stack.append(node)
-                for c in children:
-                    if c not in accumulated: 
-                        stack.append(c)
-        return 
-
-def find_superedge_cuts(h: SpanningTree, density_check = None) -> List[Cut]: # always two-sided
-    """
-    This function takes a SpanningTree object as input and returns a list of balanced edge cuts. 
-    A balanced edge cut is defined as a cut that divides the graph into two subsets, such that 
-    the population of each subset is close to the ideal population defined by the SpanningTree object.
-
-    :param h: The SpanningTree object representing the graph.
-    :param add_root: If set to True, an artifical node is connected to root and edge is considered as a possible cut.
-
-    :returns: A list of balanced edge cuts.
-    """
-    cuts = []
-    nodes = h.graph.nodes
-
-    for node in nodes:
-        teams = nodes[node][h.team_col]
-        if  teams <= 2*h.capacity_level:
-            pop = nodes[node][h.pop_col]
-            parts_to_merge = _part_nodes(h.successors, node)
-
-            if abs(pop - teams * h.ideal_pop) <= h.ideal_pop * teams * h.epsilon:
-                if node == h.root or abs((h.tot_pop - pop) - (h.n_teams - teams) * h.ideal_pop) <= h.ideal_pop * (h.n_teams - teams) * h.epsilon:
-                    cuts.append(Cut(subset=frozenset(parts_to_merge), assigned_teams=teams, pop=pop))
-    
-    return cuts
-
-
-# 'edge_power':   
-# "pop"      
-# "n_teams"
-# "area"
-# add_boundary_perimeters
-# n_candidates"""
-
-
-    
-def bipartition_supertree(
-    supergraph,
-    column_names: tuple[str],
-    pop_target: Union[int, float],
-    epsilon: float,
-    capacity_level: int,
-    n_teams: int,
-    density: Optional[float] = None,
-    max_attempts=100,
-    allow_pair_reselection: bool = False # do we need this?
-    ):
-    
-    for _ in range(max_attempts):
-        
-        spanning_tree = random_spanning_tree(supergraph) 
-        
-        h = SpanningTree(graph=spanning_tree, ideal_pop=pop_target, epsilon=epsilon, n_teams=n_teams, 
-                         capacity_level=capacity_level, two_sided=True, column_names=column_names, supergraph=True) 
-        
-        possible_cuts = find_superedge_cuts(h)
-        
-        if possible_cuts:
-            return random.choice(possible_cuts)  # weight?
-        print("supercut is empty")
-
-    if allow_pair_reselection:
-        raise ReselectException(
-            f"Failed to find a balanced cut after {max_attempts} attempts.\n"
-            f"Selecting a new district pair."
-        )
-    raise RuntimeError(f"Could not find a possible supercut after {max_attempts} attempts.")
-
-
-# spanningtree
-# update supergraph
-           
-# connect hierarchical_recomb

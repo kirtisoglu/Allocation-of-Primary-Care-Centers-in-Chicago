@@ -1,7 +1,7 @@
 from .bounds import Bounds
 import numpy
 from typing import Callable, List, Dict
-from partition import Partition
+
 
 
 class Validator:
@@ -28,7 +28,7 @@ class Validator:
         """
         self.constraints = constraints
 
-    def __call__(self, partition: Partition) -> bool:
+    def __call__(self, partition) -> bool:
         """
         Determine if the given partition is valid.
 
@@ -60,7 +60,7 @@ class Validator:
 
 
 def within_percent_of_ideal_population(
-    initial_partition: Partition, percent: float = 0.01, pop_key: str = "population"
+    initial_partition, percent: float = 0.02, pop_key: str = "population"
 ) -> Bounds:
     """
     Require that all districts are within a certain percent of "ideal" (i.e.,
@@ -93,7 +93,7 @@ def within_percent_of_ideal_population(
 
 
 def deviation_from_ideal(
-    partition: Partition, attribute: str = "population"
+    partition, attribute: str = "population"
 ) -> Dict[int, float]:
     """
     Computes the deviation of the given ``attribute`` from exact equality
@@ -122,7 +122,7 @@ def deviation_from_ideal(
 
 
 def districts_within_tolerance(
-    partition: Partition, attribute_name: str = "population", percentage: float = 0.1
+    partition, attribute_name: str = "population", percentage: float = 0.1
 ) -> bool:
     """
     Check if all districts are within a certain percentage of the "smallest"
@@ -151,7 +151,7 @@ def districts_within_tolerance(
 
 
 
-def no_vanishing_districts(partition: Partition) -> bool:
+def no_vanishing_districts(partition) -> bool:
     """
     Require that no districts be completely consumed.
 

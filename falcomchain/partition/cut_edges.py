@@ -107,6 +107,7 @@ def cut_edges_by_part(
     :returns: The new set of cut edges for the newly generated partition.
     :rtype: Set
     """
+        
     return (previous | new_edges) - old_edges
 
 

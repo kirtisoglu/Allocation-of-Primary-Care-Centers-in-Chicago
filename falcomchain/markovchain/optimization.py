@@ -1,5 +1,5 @@
 from .chain import MarkovChain
-from partition import Partition
+from falcomchain.partition import Partition
 import random
 from typing import Union, Callable, List, Any
 from tqdm import tqdm

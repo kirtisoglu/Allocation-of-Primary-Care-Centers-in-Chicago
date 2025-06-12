@@ -3,7 +3,6 @@ from itertools import count
 
 import networkx as nx
 from typing import Callable, Any, Dict, Set
-from partition import Partition
 import random
 from .bounds import SelfConfiguringLowerBound
 
@@ -63,7 +62,7 @@ def are_reachable(G: nx.Graph, source: Any, avoid: Callable, targets: Any) -> bo
     return all(t in seen for t in targets)
 
 
-def single_flip_contiguous(partition: Partition) -> bool:
+def single_flip_contiguous(partition) -> bool:
     """
     Check if swapping the given node from its old assignment disconnects the
     old assignment class.
@@ -138,7 +137,7 @@ def single_flip_contiguous(partition: Partition) -> bool:
     return True
 
 
-def affected_parts(partition: Partition) -> Set[int]:
+def affected_parts(partition) -> Set[int]:
     """
     Checks which partitions were affected by the change of nodes.
 
@@ -166,7 +165,7 @@ def affected_parts(partition: Partition) -> Set[int]:
     return affected
 
 
-def contiguous(partition: Partition) -> bool:
+def contiguous(partition) -> bool:
     """
     Check if the parts of a partition are connected using :func:`networkx.is_connected`.
 
@@ -181,7 +180,7 @@ def contiguous(partition: Partition) -> bool:
     )
 
 
-def contiguous_bfs(partition: Partition) -> bool:
+def contiguous_bfs(partition) -> bool:
     """
     Checks that a given partition's parts are connected as graphs using a simple
     breadth-first search.
@@ -204,7 +203,7 @@ def contiguous_bfs(partition: Partition) -> bool:
     return True
 
 
-def number_of_contiguous_parts(partition: Partition) -> int:
+def number_of_contiguous_parts(partition) -> int:
     """
     :param partition: Instance of Partition; contains connected components.
     :type partition: Partition
@@ -223,7 +222,7 @@ def number_of_contiguous_parts(partition: Partition) -> int:
 no_more_discontiguous = SelfConfiguringLowerBound(number_of_contiguous_parts)
 
 
-def contiguous_components(partition: Partition) -> Dict[int, list]:
+def contiguous_components(partition) -> Dict[int, list]:
     """
     Return the connected components of each of the subgraphs of the parts
     of the partition.

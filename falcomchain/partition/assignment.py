@@ -1,9 +1,11 @@
 from collections import defaultdict
 from collections.abc import Mapping
 from typing import Dict, Union, Optional, DefaultDict, Set, Type, Tuple
-from graph import Graph
-
 import pandas
+
+from falcomchain.graph import Graph
+
+
 
 
 class Assignment(Mapping):
@@ -17,21 +19,25 @@ class Assignment(Mapping):
     An :class:`Assignment` has a ``parts`` property that is a dictionary of the form
     ``{part: <frozenset of nodes in part>}``.
     """
-
-    __slots__ = ["parts", "mapping", "centers", "radius", "candidates"]
+    
+    __slots__ = ["parts", "mapping", "candidates", "teams", "centers", "radius"]
+    
+    travel_times = None
 
     def __init__(
-        self, parts: Dict, candidates: Dict, travel_times: Dict, mapping: Optional[Dict] = None, validate: bool = True
+        self, parts: Dict, candidates: Dict, teams: Dict, mapping: Optional[Dict] = None, validate: bool = True
     ) -> None:
         """
         :param parts: Dictionary mapping partition assignments frozensets of nodes.
         :type parts: Dict
         :param centers:
-        :type parts: Dict
+        :type centers: Dict
         :param radius:
-        :type parts: Dict
+        :type radius: Dict
         :param candidates:
-        :type parts: Dict 
+        :type candidates: Dict 
+        param teams:
+        :type teams: Dict 
         :param mapping: Dictionary mapping nodes to partition assignments. Default is None.
         :type mapping: Optional[Dict], optional
         :param validate: Whether to validate the assignment. Default is True.
@@ -52,15 +58,17 @@ class Assignment(Mapping):
         
         self.parts = parts
         self.candidates = candidates
+        self.teams = teams
         
         self.centers = {} 
         self.radius = {}
         for part in parts.keys():
-            self.centers[part], self.radius[part] = self.facility_assignment(part, travel_times)
+            self.centers[part], self.radius[part] = self.facility_assignment(part)
+
 
         if not mapping:
             self.mapping = {}
-            for part, nodes in self.parts.items():
+            for part, nodes in self.parts.items(): 
                 for node in nodes:
                     self.mapping[node] = part
         else:
@@ -78,13 +86,12 @@ class Assignment(Mapping):
     def __getitem__(self, node):
         return self.mapping[node]
 
-    # add travel times 
-    def copy(self, travel_times):
+    def copy(self):
         """
         Returns a copy of the assignment.
         Does not duplicate the frozensets of nodes, just the parts dictionary.
         """
-        return Assignment(self.parts.copy(), self.candidates.copy(), travel_times, self.mapping.copy(), validate=False)
+        return Assignment(self.parts.copy(), self.candidates.copy(), self.teams.copy(), self.mapping.copy(), validate=False)
 
 
     def add_districts(self, id_flow):  # see the types of attributes
@@ -92,9 +99,9 @@ class Assignment(Mapping):
         for id in id_flow["in"]:
             self.parts[id] = set()
             self.candidates[id] = set()
-            self.centers[id] = set()   
+            self.centers[id] = None  
             self.radius[id] = None
-            self.teams[id] = None
+            self.teams[id] = None  
         
     
     def remove_districts(self, id_flow):
@@ -111,12 +118,12 @@ class Assignment(Mapping):
     
     def candidate_flows(self, flow):
         listoffrozensets = [s for s in self.candidates.values()]
-        all_candidates = frozenset().union(*listoffrozensets)
+        all_candidates = set().union(*listoffrozensets)
         return flow["in"] & all_candidates 
     
 
-     
-    def update_flows(self, flows, id_flow, travel_times):
+        
+    def update_flows(self, flows, id_flow, team_flips):
         """
         Update the assignment for some nodes using the given flows.
         """
@@ -126,13 +133,14 @@ class Assignment(Mapping):
                 
             self.parts[part] = (self.parts[part] - flow["out"]) | flow["in"]
             self.candidates[part] = (self.candidates[part] - flow["out"]) | self.candidate_flows(flow)
-            self.centers[part], self.radius[part] = self.facility_assignment(part, travel_times)
-            #print("updated parts[part]", self.parts[part])
-            #print("updated candidates[part]", self.candidates[part])
+            self.centers[part], self.radius[part] = self.facility_assignment(part)
             for node in flow["in"]:
                 self.mapping[node] = part
 
+        for part in team_flips:
+            self.teams[part] = team_flips[part]
 
+        self.remove_districts(id_flow)
                 
 
                 
@@ -183,7 +191,7 @@ class Assignment(Mapping):
         return self.mapping
 
     @classmethod
-    def from_dict(cls, assignment: Dict, graph: Graph, column_names: Tuple[str], travel_times: Dict) -> "Assignment":
+    def from_dict(cls, assignment: Dict, graph: Graph, column_names: Tuple[str], teams: Dict) -> "Assignment":
         """
         Create an :class:`Assignment` from a dictionary. This is probably the method you want
         to use to create a new assignment.
@@ -201,15 +209,15 @@ class Assignment(Mapping):
         parts = {part: frozenset(keys) for part, keys in sets.items()}
         candidates = {part: frozenset(keys) for part, keys in facilities.items()}
 
-        return cls(parts, candidates, travel_times)
+        return cls(parts, candidates, teams)
 
 
-    def facility_assignment(self, part, travel_times): # might be cheaper if we calculate for only flow
+    def facility_assignment(self, part): # might be cheaper if we calculate for only flow
     
         save_candidates_radius = {}
 
         for candidate in self.candidates[part]:
-            candidate_radius = max(travel_times[(node, candidate)] for node in self.parts[part])
+            candidate_radius = max(self.travel_times[(node, candidate)] for node in self.parts[part])
             save_candidates_radius[candidate] = candidate_radius
             
         best_candidate = min(save_candidates_radius, key=save_candidates_radius.get) # center of the part
@@ -218,7 +226,7 @@ class Assignment(Mapping):
 
 
 def get_assignment(
-    part_assignment: Union[str, Dict, Assignment], graph: Optional[Graph], column_names: list[str], travel_times: Dict
+    part_assignment: Union[str, Dict, Assignment], graph: Optional[Graph], column_names: list[str], teams: Dict
 ) -> Assignment:
     """
     Either extracts an :class:`Assignment` object from the input graph
@@ -250,7 +258,7 @@ def get_assignment(
     #    )
     # Check if assignment is a dict or a mapping type
     #elif callable(getattr(part_assignment, "items", None)):
-    return Assignment.from_dict(part_assignment, graph, column_names, travel_times)
+    return Assignment.from_dict(part_assignment, graph, column_names, teams)
     #elif isinstance(part_assignment, Assignment):
     #    return part_assignment
     #else:
@@ -282,11 +290,11 @@ def level_sets(assignment: dict, graph, column_names: list, container: type[Set]
     """
     sets: Dict = defaultdict(container)
     candidates: Dict = defaultdict(container)
-    facility_attr = 'real_phc'
+    facility_attr = 'candidate'
 
     for node, part in assignment.items():
         sets[part].add(node)
-        if graph.nodes[node][facility_attr]==True:
+        if graph.nodes[node][column_names[2]]==True:
             candidates[part].add(node)  
             
     for part in sets.keys():

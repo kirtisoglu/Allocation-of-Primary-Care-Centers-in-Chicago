@@ -26,8 +26,8 @@ Last Updated: 11 Jan 2024
 
 from typing import Union, Iterable, Callable, Optional
 
-from constraints import Validator, Bounds
-from partition import Partition
+from falcomchain.constraints import Validator, Bounds
+from falcomchain.partition import Partition
 
 
 class MarkovChain:

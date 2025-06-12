@@ -14,10 +14,10 @@ Dependencies:
 
 import math
 import networkx
-from partition import Partition
-from graph import Graph
+from falcomchain.partition import Partition
+from falcomchain.graph import Graph
 
-from markovchain import polsby_popper
+from falcomchain.markovchain import polsby_popper
 from typing import Callable, Dict, Optional, Tuple, Any
 import random
 

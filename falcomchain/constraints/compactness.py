@@ -1,11 +1,10 @@
-from partition import Partition
 import math
 
 
 from .bounds import SelfConfiguringLowerBound, SelfConfiguringUpperBound
 
 
-def L1_reciprocal_polsby_popper(partition: Partition) -> float:
+def L1_reciprocal_polsby_popper(partition) -> float:
     """
     Returns the :math:`L^1` norm of the reciprocal Polsby-Popper scores
     for the given partition
@@ -19,7 +18,7 @@ def L1_reciprocal_polsby_popper(partition: Partition) -> float:
     return sum(1 / value for value in partition["polsby_popper"].values())
 
 
-def L1_polsby_popper(partition: Partition) -> float:
+def L1_polsby_popper(partition) -> float:
     """
     Returns the :math:`L^1` norm of the Polsby-Popper scores
     for the given partition
@@ -33,7 +32,7 @@ def L1_polsby_popper(partition: Partition) -> float:
     return sum(value for value in partition["polsby_popper"].values())
 
 
-def L2_polsby_popper(partition: Partition) -> float:
+def L2_polsby_popper(partition) -> float:
     """
     Returns the :math:`L^2` norm of the Polsby-Popper scores
     for the given partition.

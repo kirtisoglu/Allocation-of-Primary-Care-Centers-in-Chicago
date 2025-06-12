@@ -1,7 +1,7 @@
 import collections
 
-from ..falcomchain.partition.flows import on_flow
-from ..falcomchain.partition.cut_edges import on_edge_flow
+from .flows import on_flow
+from falcomchain.partition.cut_edges import on_edge_flow
 from typing import Dict, Set
 
 

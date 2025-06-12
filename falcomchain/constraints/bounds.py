@@ -1,5 +1,5 @@
 from typing import Callable, Tuple
-from partition import Partition
+
 
 
 class Bounds:
@@ -115,7 +115,7 @@ class SelfConfiguringUpperBound:
         self.func = func
         self.bound = None
 
-    def __call__(self, partition: Partition) -> bool:
+    def __call__(self, partition) -> bool:
         if not self.bound:
             self.bound = self.func(partition)
         return self.func(partition) <= self.bound
@@ -152,7 +152,7 @@ class SelfConfiguringLowerBound:
         self.bound = None
         self.epsilon = epsilon
 
-    def __call__(self, partition: Partition) -> bool:
+    def __call__(self, partition) -> bool:
         if not self.bound:
             self.bound = self.func(partition) - self.epsilon
         return self.func(partition) >= self.bound
@@ -195,7 +195,7 @@ class WithinPercentRangeOfBounds:
         self.lbound = None
         self.ubound = None
 
-    def __call__(self, partition: Partition) -> bool:
+    def __call__(self, partition) -> bool:
         if not (self.lbound and self.ubound):
             self.lbound = self.func(partition) * (1.0 - self.percent)
             self.ubound = self.func(partition) * (1.0 + self.percent)

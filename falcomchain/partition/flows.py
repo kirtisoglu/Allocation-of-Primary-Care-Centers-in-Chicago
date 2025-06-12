@@ -120,11 +120,16 @@ def on_flow(initializer: Callable, alias: str) -> Callable:
                 previous = partition.parent[alias]
 
             new_values = previous.copy()
-
+            
+            for part in partition.id_flow["in"]:
+                new_values[part] = set()
+        
             for part, flow in partition.flows.items():
                 new_values[part] = function(
-                    partition, previous[part], flow["in"], flow["out"]
-                )
+                    partition, previous[part], flow["in"], flow["out"])
+                
+            for part in partition.id_flow["out"]:
+                new_values.pop(part, None)
 
             return new_values
 
@@ -132,6 +137,7 @@ def on_flow(initializer: Callable, alias: str) -> Callable:
 
     return decorator
 
+        
 
 def compute_edge_flows(partition) -> Dict:
     """
@@ -170,7 +176,7 @@ def compute_edge_flows(partition) -> Dict:
             # edge is listed under the correct parts.
             no_longer_incident_parts = {old_target, old_source} - {
                 new_target,
-                new_source,
+                new_source
             }
             for part in no_longer_incident_parts:
                 edge_flows[part]["out"].add(edge)
@@ -228,6 +234,11 @@ def on_edge_flow(initializer: Callable, alias: str) -> Callable:
             previous = partition.parent[alias]
 
             new_values = previous.copy()
+            for part in partition.id_flow["out"]:
+                new_values.pop(part, None)
+            for part in partition.id_flow["in"]:
+                new_values[part] = set()
+                
             for part in partition.edge_flows:
                 new_values[part] = f(
                     partition,

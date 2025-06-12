@@ -1,5 +1,5 @@
 from typing import List, Any, Tuple
-from graph import Graph
+from falcomchain.graph import Graph
 
 
 class SubgraphView:
@@ -48,11 +48,11 @@ class SubgraphView:
             self.subgraphs_cache[part] = self.graph.subgraph(self.parts[part])
         return self.subgraphs_cache[part]
 
-    def __iter__(self) -> Graph:
+    def __iter__(self):
         for part in self.parts:
             yield self[part]
 
-    def items(self) -> Tuple[int, Graph]:
+    def items(self):
         for part in self.parts:
             yield part, self[part]
 

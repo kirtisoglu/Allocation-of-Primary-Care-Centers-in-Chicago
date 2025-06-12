@@ -1,8 +1,9 @@
 import random
-from partition import Partition
-from tree import (capacitated_recursive_tree, ReselectException)
-from partition import cut_edges, cut_edges_by_part, bipartition_supertree
-from collections import deque
+from falcomchain.partition import Partition
+from falcomchain.tree import (capacitated_recursive_tree, ReselectException, bipartition_tree)
+from falcomchain.partition import cut_edges, cut_edges_by_part
+from collections import deque, namedtuple
+from functools import partial
 
 class MetagraphError(Exception):
     """
@@ -20,6 +21,84 @@ class ValueWarning(UserWarning):
     """
 
     pass
+
+
+
+# Tuple that is used for flips and super_flips
+Flip = namedtuple("Flip", "flips team_flips merged_ids new_ids")
+Flip.__doc__ = "Represents a flip in a capacitated_recursive_tree operation."
+#Flip.edge.__doc__ = "Flips that are made. Defaults to None."
+Flip.flips.__doc__ = ("")
+Flip.team_flips.__doc__ = ""
+Flip.merged_ids.__doc__ = ""
+Flip.new_ids.__doc__ = ""
+        
+        
+
+def hierarchical_recom(partition: Partition,
+    pop_target: int,
+    column_names: tuple[str],
+    epsilon: float,
+    density: float = None,
+) -> Partition:
+    """_summary_
+
+    Args:
+        partition (Partition): _description_
+        pop_target (int): _description_
+        column_names (tuple[str]): _description_
+        epsilon (float): _description_
+        density (float, optional): _description_. Defaults to None.
+        supergraph (str, optional): Local or global. Defaults to None.
+
+    Returns:
+        Partition: _description_
+    """
+    
+    method = partial(capacitated_recursive_tree, 
+                     column_names=column_names, 
+                     capacity_level=partition.capacity_level,
+                     pop_target=pop_target, # needs to be observed. A different pop_target for the lower level?
+                     epsilon=epsilon,
+                     density=density)
+    
+
+        # UPPER LEVEL: selecting districts from supergraph to merge
+     
+    all_teams = sum(team for team in partition.teams.values())
+
+    try:
+        super_flips, super_team_flips, super_new_ids= method(graph=partition.supergraph, n_teams=all_teams, supergraph=True)
+    except Exception:
+        raise
+    
+    # For now, we merge only one super district picking it randomly 
+    super_partition = {super_district : set() for super_district in set(super_flips.values())}
+    for supernode in super_flips.keys():
+        super_partition[super_flips[supernode]].add(supernode)
+    superdistrict_to_merge = random.choice(list(super_partition.keys()))
+    merged_ids = super_partition[superdistrict_to_merge]
+    
+    super_flip = Flip(flips=frozenset(super_flips), team_flips=super_team_flips, merged_ids=superdistrict_to_merge, new_ids=super_new_ids)  
+    
+
+        # LOWER LEVEL: resplitting merged districts
+    
+    subgraph = partition.graph.subgraph(set.union(*(set(partition.parts[part]) for part in merged_ids)))
+    merged_teams = sum(partition.teams[part] for part in merged_ids)
+    max_id = max(district for district in partition.parts)  
+    sub_assignments = {node: partition.assignment.mapping[node] for node in subgraph}
+
+    try:
+        flips, team_flips, new_ids = method(graph=subgraph, n_teams=merged_teams, merged_ids=merged_ids, assignments=sub_assignments, max_id=max_id)
+    except Exception:
+        raise
+
+    flip = Flip(flips=frozenset(flips), team_flips=team_flips, merged_ids=merged_ids, new_ids=new_ids)
+    
+
+                
+    return partition.flip(flips, team_flips, new_ids, super_flip)
 
 
 
@@ -101,76 +180,6 @@ def recom( # Note: recomb is called for each state of the chain. Parameters must
         )
                 
     return partition.flip(flips, new_teams)
-
-
-
-def hierarchical_recomb(partition: Partition,
-    pop_target: int,
-    column_names: tuple[str],
-    epsilon: float,
-    density: float = None,
-) -> Partition:
-    """_summary_
-
-    Args:
-        partition (Partition): _description_
-        pop_target (int): _description_
-        column_names (tuple[str]): _description_
-        epsilon (float): _description_
-        density (float, optional): _description_. Defaults to None.
-        supergraph (str, optional): Local or global. Defaults to None.
-
-    Returns:
-        Partition: _description_
-    """
-
-    bad_selection = set()
-    n_parts = len(partition)
-    tot_pairs = n_parts * (n_parts - 1) / 2 
-    ids = set(partition.parts.keys())
-
-    while len(bad_selection) < tot_pairs:  # we need to change this to something related to supergraph
-        try:
-            while True:
-                parts_to_merge = bipartition_supertree(
-                    supergraph=partition.supergraph)
-                parts_to_merge.sort() # Need to sort the tuple so that the order is consistent in the bad_selection set
-                
-                if tuple(parts_to_merge) not in  bad_selection:
-                    break
-
-            n_teams = sum(partition.teams[part] for part in parts_to_merge)
-            subgraph = partition.graph.subgraph(set.union(*(set(partition.parts[part]) for part in parts_to_merge)))
-
-            flips, new_teams, remaining_ids, new_ids = capacitated_recursive_tree(
-                graph = subgraph.graph,
-                column_names = column_names,
-                n_teams=n_teams,
-                pop_target=pop_target,
-                epsilon=epsilon,
-                capacity_level=partition.capacity_level,
-                density = density,
-                assignments = partition.assignment, # ??
-                merged_ids=ids, # ??
-                max_id = max_id # ??
-            )
-            break
-
-        except Exception as e:
-            if isinstance(e, ReselectException):  # if there is no balanced cut after max_attempt in bipartition_tree, then the pair is a bad district pair.
-                bad_selection.add(tuple(parts_to_merge))
-                continue
-            else:
-                raise
-
-    if len(bad_selection) == tot_pairs:
-        raise MetagraphError(
-            f"Bipartitioning failed for {tot_pairs} of district collections."
-            f"Consider rerunning the chain with a different random seed."
-        )
-                
-    return partition.flip(flips, new_teams, merged_ids, new_ids)
-
 
 
 def propose_chunk_flip(partition: Partition) -> Partition:

@@ -12,7 +12,7 @@ import plotly.express as px
 import branca.colormap as cm
 import branca
 from .data_handler import DataHandler
-from partition import Partition
+
 import folium
 from folium import plugins
 import geopandas
@@ -81,8 +81,8 @@ class Plot:
     
 
 # Plot initial and final solutions side by side
-    def compare(self, initial_partition: Partition, final_partition: Partition):
-        
+    def compare(self, initial_partition, final_partition):
+        from partition import Partition
         "plots initial and final partitions of recomb chain side by side"
         
         centers = self.geo_candidates.loc[self.geo_candidates['block'].isin(final_partition.centers.values())] 
