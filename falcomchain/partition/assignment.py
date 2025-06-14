@@ -102,7 +102,6 @@ class Assignment(Mapping):
             self.centers[id] = None  
             self.radius[id] = None
             self.teams[id] = None  
-        
     
     def remove_districts(self, id_flow):
         

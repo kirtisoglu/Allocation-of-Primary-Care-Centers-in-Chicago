@@ -82,115 +82,6 @@ Combining Pickle with compression can optimize storage for large data.
 """
 
 
- 
-def cache_data(data: Any, file_path: str, method: str = None) -> None:
-    """
-    Cache data to a file using the specified method.
-    
-    Parameters:
-    - data (Any): The data to cache.
-    - file_path (str): The path to the file where data should be cached.
-    - method (str, optional): The method to use for caching ('parquet', 'json_gzip', 'pickle', or 'pickle_gzip').
-      Defaults to None.
-    """
-    
-    if method == 'parquet':
-        # Ensure pandas is installed and the data type is appropriate for a DataFrame
-        try:
-            import pandas as pd
-            if not isinstance(data, pd.DataFrame):
-                raise TypeError("Data must be a pandas DataFrame for parquet method.")
-            data.to_parquet(file_path)
-        except ImportError:
-            raise ImportError("Pandas is required for the 'parquet' method.")
-    
-    elif method == 'json_gzip':
-        # JSON and gzip are part of the standard library
-        with gzip.open(file_path, 'wt', encoding='utf-8') as zipf:
-            json.dump(data, zipf)
-    
-    elif method == 'geojson_gzip':
-        import geopandas as gpd
-        data_json = data.to_json() # Convert the GeoDataFrame to a GeoJSON string
-        with gzip.open(file_path, 'wt', encoding='utf-8') as gz_file:
-            gz_file.write(data_json)
-    
-    elif method == 'pickle':
-        with open(file_path, 'wb') as f:
-            pickle.dump(data, f)
-    
-    elif method == 'pickle_gzip':
-        with gzip.open(file_path, 'wb') as zipf:
-            pickle.dump(data, zipf)
-    
-    else:
-        raise ValueError("Unsupported method specified. Choose 'parquet', 'json_gzip', 'pickle', or 'pickle_gzip'.")
-   
-
-
-
-
-def load_data(file_path: str, method: str = None) -> any:
-    """
-    Load data from a file using the specified method or infer from file extension.
-    
-    Parameters:
-    - file_path (str): The path to the file from which data should be loaded.
-    - method (str, optional): The method to use for loading ('parquet', 'pickle_gzip', 'json_gzip', or 'pickle').
-      If None, the method is inferred from the file extension.
-      
-    Returns:
-    Loaded data.
-    """
-
-    # Infer the loading method from the file extension if not specified
-    if method is None:
-        if file_path.endswith('.parquet'):
-            method = 'parquet'
-        elif file_path.endswith('.pkl.gz'):
-            method = 'pickle_gzip'
-        elif file_path.endswith('.json.gz'):
-            method = 'json_gzip'
-        elif file_path.endswith('.pkl'):
-            method = 'pickle'
-        elif file_path.endswith('.geojson.gz'):
-            method = 'geojson_gzip'
-        else:
-            raise ValueError("File extension not recognized and no method specified.")
-
-    # Load data based on the method
-    if method == 'parquet':
-        try:
-            import pandas as pd
-            return pd.read_parquet(file_path)
-        except ImportError:
-            raise ImportError("Pandas is required to load parquet files.")
-    
-    elif method == 'pickle':
-        with open(file_path, 'rb') as f:
-            return pickle.load(f)
-    
-    elif method == 'pickle_gzip':
-        with gzip.open(file_path, 'rb') as zipf:
-            return pickle.load(zipf)
-    
-    elif method == 'json_gzip':
-        try:
-            with gzip.open(file_path, 'rt', encoding='utf-8') as zipf:
-                return json.load(zipf)
-        except json.JSONDecodeError as e:
-            raise Exception("Failed to decode JSON: " + str(e))
-        except Exception as e:
-            raise Exception("Failed to load or parse the file: " + str(e))
-    
-    elif method == 'geojson_gzip':
-        with gzip.open(file_path, 'rt', encoding='utf-8') as gz_file:
-            return gpd.read_file(gz_file)
-    
-    else:
-        raise ValueError("Unsupported method specified.")
-
-
  # MEMORY USAGE NOTES
  
 # Pandas provides a .memory_usage() method that can be called on a DataFrame to see the memory usage of each column.
@@ -257,32 +148,6 @@ def memory_usage(data: Any, data_type: str = None) -> None:
 
     
 
-def get_column(data = Any, column = str):
-    
-    """
-    Summary?
-
-    Parameters:
-    data (Any): The data whose memory usage is to be determined.
-    column (str): 
-    
-    Returns:
-    
-    """
-    
-    data['GEOID20'] = data['GEOID20'].astype(str)
-    tracts = pd.read_csv('data/chicago_tracts.csv')
-    # Convert tracts to string
-    tracts = tracts.astype(str)
-    # perform filtering operation
-    chicago_dhc = data[data['GEOID20'].str[:11].isin(tracts['digits'])]
-    #chicago_dhc
-    
-    # Create a dictionary from the DataFrame for faster lookup
-    df_dict = chicago_dhc.set_index('GEOID20')[column].to_dict()
-    
-    return df_dict
-
 
 
 
@@ -292,7 +157,7 @@ def add_to_graph(graph, dictionary):
     Summary?
 
     Parameters:
-    data (Any): The data whose memory usage is to be determined.
+    data (Any):
     file_path (str):
     column (str): 
     
@@ -321,21 +186,6 @@ def add_to_data(chicago, geoid_dict):
 
 
 
-
-def to_geojson(df: DataFrame):
-    if isinstance(df, gpd.GeoDataFrame) and 'geometry' in df.columns:
-        geojson = {
-            "type": "FeatureCollection",
-            "features": [
-                {"type": "Feature",
-                 "properties": row.drop('geometry').to_dict(),
-                 "geometry": mapping(row['geometry'])
-                } for idx, row in df.iterrows()
-            ]
-        }
-        return geojson
-    else:
-        raise ValueError("Input is not a valid GeoDataFrame with a 'geometry' column.")
   
     
     
@@ -370,24 +220,24 @@ def projection(data):
 
 
 
-def random_phc(data):  
+def random_phc(data, num, weight):  
       
-    # Randomly select 1000 census blocks, weighted by population
-    selected_blocks = data.sample(n=1000, weights='pop', random_state=42)
+    # Randomly select 'num' of census blocks
+    selected_blocks = data.sample(n=num, weights=weight, random_state=42)
 
     # Step 2: Extract the 'centroid' geometries of these selected blocks to use as PHC locations
-    phc_locations = selected_blocks['centroid']
+    facility_locations = selected_blocks['centroid']
 
     # Create a GeoDataFrame for PHC locations
-    phc_gdf = gpd.GeoDataFrame(geometry=phc_locations, crs=data.crs)
+    facility_gdf = gpd.GeoDataFrame(geometry=facility_locations, crs=data.crs)
 
     # Prepare latitude and longitude for plotting
-    phc_df = pd.DataFrame({
-        'lat': phc_gdf.geometry.y,
-        'lon': phc_gdf.geometry.x
+    facility_df = pd.DataFrame({
+        'lat': facility_gdf.geometry.y,
+        'lon': facility_gdf.geometry.x
     })
 
-    return phc_df, selected_blocks
+    return facility_df, selected_blocks
 
 
 

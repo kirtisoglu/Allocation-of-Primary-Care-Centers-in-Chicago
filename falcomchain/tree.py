@@ -43,6 +43,8 @@ from typing import (
 )
 import time
 
+from falcomchain.helper import save_tree_class
+
 
 def plot_map(chicago, geo_centers, assignment, attr):
     import folium
@@ -147,13 +149,7 @@ class SpanningTree:
         self.two_sided = two_sided
         
         # if we do this before, can we speed up the algorithm significantly?
-        self.tot_candidates = 0
-        for node in self.graph.nodes:
-            if self.graph.nodes[node][self.facility_col]==True:
-                self.graph.nodes[node][self.facility_col] = 1
-                self.tot_candidates += 1
-            else:
-                self.graph.nodes[node][self.facility_col] = 0
+        self.tot_candidates = {1 for node in self.graph.nodes if self.graph.nodes[node][self.facility_col]==1}
         
         if self.supertree == True:
             accumulation_columns = {self.pop_col, self.area_col, self.team_col} 
@@ -488,6 +484,7 @@ def bipartition_tree(
             f"Failed to find a balanced cut after {max_attempts} attempts.\n"
             f"Selecting a new district pair."
         )
+    save_tree_class(h.graphe, h.root, h.ideal_pop, h.n_teams, h.epsilon, h.supertree, h.two_sided, h.tot_candidates)
     raise RuntimeError(f"Could not find a possible cut after {max_attempts} attempts.")
 
 

@@ -132,6 +132,6 @@ def cut_edges(partition):
     # up with both (4,5) and (5,4) (for example) in it
     new, obsolete = new_cuts(partition), obsolete_cuts(partition)
 
-    return (parent["cut_edges"] | new) - obsolete
+    return (parent.cut_edges | new) - obsolete
 
 

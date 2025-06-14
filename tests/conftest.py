@@ -80,11 +80,28 @@ def spanningtree_with_forced_root(tree_with_attributes):
     return tree
 
 
+
 @pytest.fixture
-def partition():
+def planar_graph():
+    """Returns a tree that looks like this:
     
-   
+    1 - 2 - 3 - 4
+        |   |   |
+    5 - 6 - 7   8 - 9 - 10
+    |   |   |       |
+    11-12   13  -   14
+    |  |
+    15-16-17
+    |     |
+    18-19-21
+    |
+    20
     
-    return partition
+    """
+    
+    new_edges = (19,21),(17,21),(17,21),(13,14),(3,7),(12,16),(6,12)
+    new_nodes = {21}
+
+
 
 

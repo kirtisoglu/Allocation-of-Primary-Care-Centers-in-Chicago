@@ -82,7 +82,10 @@ def within_percent_of_ideal_population(
     """
 
     def population(partition):
-        return partition[pop_key].values()
+        pop={}
+        for node in partition.supergraph.nodes:
+            pop[node] = partition.supergraph.nodes[node]['population']
+        return pop.values()
 
     number_of_districts = len(initial_partition[pop_key].keys())
     total_population = sum(initial_partition[pop_key].values())

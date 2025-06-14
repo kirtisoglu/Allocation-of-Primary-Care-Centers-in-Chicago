@@ -61,26 +61,25 @@ class Grid:
         if len(dimensions)!=2:
             raise Exception("Dimension must be 2.")
 
-        self.dimensions = dimensions
         self.density = density
-        self.graph = self.create_grid_graph()
+        self.graph = self.create_grid_graph(dimensions)
         self.num_candidates = num_candidates
-        self.threshold = threshold
         self.candidate_ignore = candidate_ignore
         
         self.assign_coordinates()
         self.assign_candidates()
-        self.tag_boundary_nodes()
+        self.tag_boundary_nodes(dimensions)
+        self.get_boundary_perim(dimensions)
         
         if self.density != 'uniform':
-            self.assign_population()
+            self.assign_population(dimensions, threshold)
 
         # final step
         self.graph = Graph.from_networkx(self.graph)  # convert graph into Graph object
 
 
     # Main function which creates a grid graph with required node and edge attributes
-    def create_grid_graph(self) -> Graph:
+    def create_grid_graph(self, dimensions: tuple) -> Graph:
         """
         Creates a grid graph with the specified dimensions.
         Optionally includes diagonal connections between nodes.
@@ -95,7 +94,7 @@ class Grid:
 
         :raises ValueError: If the dimensions are not a tuple of length 2.
         """
-        m, n = self.dimensions
+        m, n = dimensions
         graph = networkx.generators.lattice.grid_2d_graph(m, n)
 
         networkx.set_edge_attributes(graph, 1, "shared_perim")
@@ -103,9 +102,11 @@ class Grid:
         networkx.set_node_attributes(graph, 50, "population")
         networkx.set_node_attributes(graph, 1, "C_X")
         networkx.set_node_attributes(graph, 1, "C_Y")
-        
         networkx.set_node_attributes(graph, 1, "area")
-        networkx.set_node_attributes(graph, False, "candidate")
+        
+        values = {node: False for node in graph.nodes}
+        networkx.set_node_attributes(graph, values, name='candidate')
+
 
         return graph
 
@@ -130,21 +131,24 @@ class Grid:
 
     def assign_candidates(self) -> None:
         "Sets self.num_candidates many nodes as candidates uniformly random on permitted region"
-        nodes = set(list(self.graph.nodes))
+        nodes = set(self.graph.nodes)
         
         if self.candidate_ignore != None:
-            x_0, y_0 = node
-            ignore = {node for node in set if node[0] < x_0 or node[1] < y_0}
+            x_0, y_0 = self.candidate_ignore
+            ignore = {node for node in nodes if node[0] < x_0 or node[1] < y_0}
             nodes = nodes - ignore
         
-        candidates = random.choices(population = list(nodes) , k = self.num_candidates)
+        candidates = random.sample(list(nodes), k=self.num_candidates)
         
-        for node in candidates:
-            self.graph.nodes[node]['candidate'] = True
-        
+        for node in self.graph.nodes:
+            if node in candidates:
+                self.graph.nodes[node]['candidate'] = True
+            else:
+                self.graph.nodes[node]['candidate'] = False
+
         
 
-    def tag_boundary_nodes(self) -> None:
+    def tag_boundary_nodes(self, dimensions: tuple) -> None:
         """
         Adds the boolean attribute ``boundary_node`` to each node in the graph.
         If the node is on the boundary of the grid, that node also gets the attribute
@@ -157,16 +161,15 @@ class Grid:
 
         :returns: None
         """
-        m, n = self.dimensions
+        m, n = dimensions
         for node in self.graph.nodes:
-            if node[0] in [0, m - 1] or node[1] in [0, n - 1]:
+            if node[0] in {0, m - 1} or node[1] in {0, n - 1}:
                 self.graph.nodes[node]["boundary_node"] = True
-                self.graph.nodes[node]["boundary_perim"] = self.get_boundary_perim(node)
             else:
                 self.graph.nodes[node]["boundary_node"] = False
 
 
-    def get_boundary_perim(self, node: Tuple[int, int]) -> int:
+    def get_boundary_perim(self, dimensions: tuple) -> int:  # this is wrong and useless
         """
         Determines the boundary perimeter of a node on the grid.
         The boundary perimeter is the number of sides of the node that
@@ -180,16 +183,24 @@ class Grid:
         :returns: The boundary perimeter of the node.
         :rtype: int
         """
-        m, n = self.dimensions
-        if node in [(0, 0), (m - 1, 0), (0, n - 1), (m - 1, n - 1)]:
-            return 2
-        elif node[0] in [0, m - 1] or node[1] in [0, n - 1]:
-            return 1
-        else:
-            return 0
+        m, n = dimensions
+        corners = {(0, 0), (m - 1, 0), (0, n - 1), (m - 1, n - 1)}
+        middle = {node for node in self.graph.nodes if 0 < node[0] < m-1 and 0 < node[1] < n-1}
+        sides = set(self.graph.nodes) - (corners.union(middle))
+        
+        for node in corners:
+            self.graph.nodes[node]['boundary_perim'] = 2
+        
+        for node in middle:
+            self.graph.nodes[node]['boundary_perim'] = 0
+            
+        for node in sides:
+            self.graph.nodes[node]['boundary_perim'] = 1
+            
+        
 
 
-    def assign_population(self) -> int:
+    def assign_population(self, dimensions:tuple, threshold:tuple) -> int:
         """
         Assigns a color (as an integer) to a node based on its x-coordinate.
 
@@ -210,16 +221,16 @@ class Grid:
         if self.density == "opposite":  
             for node in self.graph.nodes:
                 x, y = node
-                if x >= self.threshold[0] and y>= self.threshold[1]:
+                if x >= threshold[0] and y>= threshold[1]:
                     self.graph.nodes[node]['population'] = 70
-                elif x < self.threshold[0] and y < self.threshold[1]:
+                elif x < threshold[0] and y < threshold[1]:
                     self.graph.nodes[node]['population'] = 70
                 else:
                     self.graph.nodes[node]['population'] = 30
                   
         if self.density == "corners":
-            k_1, k_2 = self.threshold
-            m, n = self.dimensions
+            k_1, k_2 = threshold
+            m, n = dimensions
             for node in self.graph.nodes:
                 x, y = node
                 if k_1 <= x < m - k_1 or k_2 <= y < n - k_2:

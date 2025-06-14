@@ -1,5 +1,5 @@
-falcomchain/prepared_data/
-initial_data/
+data/processed
+falcomchain/data/primary
 arcgis_data/
 .vscode/
 .ipynb_checkpoints/

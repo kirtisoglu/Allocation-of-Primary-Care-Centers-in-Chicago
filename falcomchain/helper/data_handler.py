@@ -13,7 +13,6 @@ from pandas import DataFrame
 from typing import Any
 
 
-
       
 class DataHandler: ### Edit initialization for logical consistency. If full_path is given?   
     
@@ -21,26 +20,23 @@ class DataHandler: ### Edit initialization for logical consistency. If full_path
     def __init__(self, base_path=None, base_path_2=None, base_path_3=None):
         
         if base_path == None:
-            self.base_path = "/Users/kirtisoglu/Documents/Documents/GitHub/Allocation-of-Primary-Care-Centers-in-Chicago/falcomchain/prepared_data"
+            self.base_path = "/Users/kirtisoglu/Documents/Documents/GitHub/Allocation-of-Primary-Care-Centers-in-Chicago/data/processed"
         else:
             self.base_path = base_path
         
         if base_path_2 == None:
-            self.base_path_2 = "/Users/kirtisoglu/Documents/Documents/GitHub/Allocation-of-Primary-Care-Centers-in-Chicago/falcomchain/prepared_data"
+            self.base_path_2 = "/Users/kirtisoglu/Documents/Documents/GitHub/Allocation-of-Primary-Care-Centers-in-Chicago/data/processed"
         else:
             self.base_path_2 = base_path_2
             
         if base_path_3 == None:
-            self.base_path_3 = "/Users/kirtisoglu/Documents/Documents/GitHub/Allocation-of-Primary-Care-Centers-in-Chicago/falcomchain/prepared_data"
+            self.base_path_3 = "/Users/kirtisoglu/Documents/Documents/GitHub/Allocation-of-Primary-Care-Centers-in-Chicago/data/processed"
         else: 
             self.base_path_3 = base_path_3
-            
-            
-            
+        
         self.files = self.detect_existing_data()
         self._create_properties()
         
-    
     
     def get_full_extension(self, filename):
         parts = filename.split('.')
@@ -168,14 +164,6 @@ class DataHandler: ### Edit initialization for logical consistency. If full_path
             raise ValueError("Unsupported data type for saving.")
 
     
-        
-
-
-
-
-
-
-
 
 # Stopped here.
 
@@ -217,7 +205,7 @@ def add_to_graph(graph, dictionary, attribute):
     Summary?
 
     Parameters:
-    data (Any): The data whose memory usage is to be determined.
+    data (Any): 
     file_path (str):
     column (str): 
     
@@ -233,6 +221,7 @@ def add_to_graph(graph, dictionary, attribute):
 
         else:
             print(f'{attribute} not in graph')
+
 
 
 def get_column(data = Any, column = str):
@@ -257,51 +246,7 @@ def get_column(data = Any, column = str):
     
     return df_dict  
                        
- 
-def to_geojson(df: DataFrame):
-    if isinstance(df, gpd.GeoDataFrame) and 'geometry' in df.columns:
-        geojson = {
-            "type": "FeatureCollection",
-            "features": [
-                {"type": "Feature",
-                 "properties": row.drop('geometry').to_dict(),
-                 "geometry": mapping(row['geometry'])
-                } for idx, row in df.iterrows()
-            ]
-        }
-        return geojson
-    else:
-        raise ValueError("Input is not a valid GeoDataFrame with a 'geometry' column.")
-     
-    
-def projection(data):
-    
-    """
-    Summary?
 
-    Parameters:
-    data (Any): The data whose memory usage is to be determined.
-    file_path (str):
-    column (str): 
-    
-    Returns:
-    """
-    
-    # reproject the geometries to a suitable projected CRS
-    data_projected = data.to_crs(epsg=32616)
-
-    # calculate centroids on the projected geometries and save them as a column in chicago data
-    data_projected['centroid'] = data_projected.geometry.centroid
-
-    # centroids in the original geographic CRS, you can project them back
-    data['centroid'] = data_projected['centroid'].to_crs(data.crs)
-
-    # calculate the mean latitude and longitude of the centroids
-    center_lat = data['centroid'].y.mean()
-    center_lon = data['centroid'].x.mean()
-    
-    return center_lat, center_lon
-    
 
 def random_phc(data):  
       
