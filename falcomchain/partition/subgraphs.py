@@ -1,4 +1,5 @@
-from typing import List, Any, Tuple
+from typing import Any, Dict, List
+
 from falcomchain.graph import Graph
 
 
@@ -21,18 +22,18 @@ class SubgraphView:
 
     __slots__ = ["graph", "parts", "subgraphs_cache"]
 
-    def __init__(self, graph: Graph, parts: List[List[Any]]) -> None:
+    def __init__(self, graph: Graph, parts: Dict) -> None:
         """
         :param graph: The parent graph from which subgraphs are derived.
         :type graph: Graph
-        :param parts: A list of lists of nodes corresponding the different
+        :param parts: A dict of nodes corresponding the different
             parts of the partition of the graph.
-        :type parts: List[List[Any]]
+        :type parts: Dict
 
         :returns: None
         """
         self.graph = graph
-        self.parts = parts  # this is introduced as list of lists. I am suspicious it is not. (parts is a dict)
+        self.parts = parts
         self.subgraphs_cache = {}
 
     def __getitem__(self, part: int) -> Graph:
@@ -50,7 +51,7 @@ class SubgraphView:
 
     def __iter__(self):
         for part in self.parts:
-            yield self[part]
+            yield self.parts[part]
 
     def items(self):
         for part in self.parts:

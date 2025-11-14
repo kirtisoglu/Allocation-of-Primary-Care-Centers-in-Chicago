@@ -1,24 +1,20 @@
-import json
-import networkx
-import folium
-import folium.plugins
-
-from .cut_edges import cut_edges 
-from .flows import compute_edge_flows, flows_from_changes, id_flows
-from .tally import Tally
-
-from .assignment import get_assignment, Assignment
-from .subgraphs import SubgraphView
-
-from falcomchain.graph import Graph, FrozenGraph
-from falcomchain.tree import capacitated_recursive_tree
-
-from typing import Any, Callable, Dict, Optional, Tuple
 from collections import namedtuple
+from typing import Any, Callable, Dict, NamedTuple, Optional, Tuple
 
-from .compactness import boundary_nodes, exterior_boundaries, interior_boundaries, perimeter
-from .cut_edges import cut_edges, cut_edges_by_part
+import networkx as nx
 
+from falcomchain.graph import FrozenGraph, Graph
+from falcomchain.helper import load_pickle, save_pickle
+from falcomchain.tree.tree import Flip, capacitated_recursive_tree
+
+from .assignment import Assignment, get_assignment
+from .flows import (
+    compute_candidate_flows,
+    compute_node_flows,
+    compute_part_flows,
+    neighbor_flips,
+)
+from .subgraphs import SubgraphView
 
 
 class Partition:
@@ -39,46 +35,28 @@ class Partition:
 
     __slots__ = (
         "graph",
+        "capacity_level",
         "subgraphs",
         "supergraph",
         "assignment",
         "parent",
-        "flips",
-        "flows", 
-        "id_flow", 
-        "edge_flows", 
-        #"_cache",
-        "team_flips",
-        "capacity_level",
-        "merged_parts",
-        #"updaters",
-        "new_ids",
         "superflip",
-        "column_names",
-        "cut_edges"
+        "flip",
+        "node_flows",
+        "part_flows",
+        "candidate_flows",
+        "step",
     )
-        
-    #default_updaters = {#"population": Tally('population', alias="population"),
-                        #"cut_edges": cut_edges,
-                        ##"perimeter": perimeter,
-                        #"area": Tally("area", alias="area")}
 
 
-    
     def __init__(
         self,
-        column_names,
-        capacity_level: Optional[int] = None,
-        team_flips = None,
-        graph=None,
-        assignment=None,
+        capacity_level: Optional[int] = None, 
+        graph=None, 
+        flip=None,
+        superflip=None,
         parent=None,
-        flips=None,
-        #updaters=None, # must contain "cut_edges" if it is not none
-        #use_default_updaters=True,
-        merged_ids: Optional[set] = None,
-        new_ids: Optional[set] = None,
-        super_flip: Optional[namedtuple] = None
+        assignment=None, # ?
     ):
         """
         :param graph: Underlying graph.
@@ -88,18 +66,23 @@ class Partition:
             which the functions compute.
         :param use_default_updaters: If `False`, do not include default updaters.
         """
+    
         
-        self.column_names = column_names
-        #self._cache = dict()
-
         if parent is None:
-            self._first_time(graph, assignment, #updaters, use_default_updaters, 
-                             team_flips, capacity_level, new_ids)
+            self._first_time(
+                graph,
+                assignment,  
+                #updaters,
+                #use_default_updaters,
+                capacity_level,
+                flip
+            )
         else:
-            self._from_parent(parent, flips, team_flips, merged_ids, new_ids, super_flip)
+            self._from_parent(parent, flip, superflip)
 
+        # define here if it is not needed to be defined before _from_parent()
+        #self._cache = dict()
         self.subgraphs = SubgraphView(self.graph, self.parts)
-        
 
     @classmethod
     def from_random_assignment(
@@ -107,12 +90,12 @@ class Partition:
         graph: Graph,
         epsilon: float,
         pop_target: int,
-        column_names,
         assignment_class: Assignment,
         #updaters: Optional[Dict[str, Callable]] = None,
         #use_default_updaters: bool = True,
-        capacity_level: Optional[int] = 1,
-        density: Optional[float]=None,
+        capacity_level=1,
+        density: Optional[float] = None,
+        snapshot=False,
     ) -> "Partition":
         """
         Create a Partition with a random assignment of nodes to districts.
@@ -139,33 +122,38 @@ class Partition:
         :returns: The partition created with a random assignment
         :rtype: Partition
         """
-        total_pop = sum(graph.nodes[n]['population'] for n in graph)
-        n_teams = (total_pop // pop_target) # if capacity_level is 1, n_teams becomes number of districts.
-        
-        flips, team_flips, new_ids = capacitated_recursive_tree(
+        total_pop = sum(graph.nodes[n]["population"] for n in graph)
+        n_teams = int(total_pop // pop_target)
+        # if capacity_level is 1, n_teams becomes number of districts.
+
+        flip = capacitated_recursive_tree(
             graph=graph,
             n_teams=n_teams,
-            pop_target=pop_target,  
+            pop_target=pop_target,
             epsilon=epsilon,
             capacity_level=capacity_level,
-            column_names=column_names,
-            density=density
+            density=density,
+            snapshot=snapshot,
         )
 
         return cls(
             capacity_level=capacity_level,
-            assignment = flips,
-            team_flips=team_flips,
+            assignment=flip.flips,
             #updaters=updaters,
             #use_default_updaters=use_default_updaters,
             graph=graph,
-            new_ids=new_ids,
-            column_names=column_names
+            flip= flip
         )
 
-    def _first_time(self, graph, assignment, #updaters, use_default_updaters, 
-                    teams, capacity_level, new_ids):
-        
+    def _first_time(
+        self,
+        graph,
+        assignment,  
+        #updaters,
+        #use_default_updaters,
+        capacity_level,
+        flip,
+    ):
         if isinstance(graph, Graph):
             self.graph = FrozenGraph(graph)
         elif isinstance(graph, networkx.Graph):
@@ -175,67 +163,57 @@ class Partition:
             self.graph = graph
         else:
             raise TypeError(f"Unsupported Graph object with type {type(graph)}")
-        
-        
-        self.capacity_level = capacity_level
-        self.assignment = get_assignment(assignment, graph, self.column_names, teams)
+
+
+        self.step = 1
         self.parent = None
-        self.cut_edges = cut_edges(self)
+        self.capacity_level = capacity_level
         
+        self.flip = flip
+        self.superflip = None
+        
+        self.node_flows = None
+        self.candidate_flows = None
+        self.part_flows = {"in": set(flip.new_ids), "out": set()}
+        self.assignment = get_assignment(assignment, graph, flip.team_flips)
+
         #if updaters is None:
-        #    updaters = dict()
+        #    updaters = {}
 
         #if use_default_updaters:
-        #    self.updaters = self.default_updaters
+        #    self.updaters = self.default_updaters.copy()  # copy
         #else:
         #    self.updaters = {}
         #self.updaters.update(updaters)
         
-        self.supergraph = Graph()
-        update_supergraph(self, incoming_edges=self.cut_edges, outgoing_edges=set())
-        
-        
-        self.flips = None
-        self.team_flips = None
-        self.flows = None
-        self.id_flow = None
-        self.edge_flows = None
-        
-        self.merged_parts = set()
-        self.new_ids = new_ids  # no need to keep this. change update_supergraph
-        self.superflip = None
+        #self.cut_edges = cut_edges(self)
+        self.supergraph = supergraph(self)
 
-            
-    def _from_parent(self, parent: "Partition", flips: Dict, team_flips: Dict, merged_ids, new_ids, super_flip) -> None:
+
+    def _from_parent(
+        self,
+        parent: "Partition",
+        flip: Flip,
+        superflip: Flip,
+    ) -> None:
+
+        self.step = parent.step + 1
         self.parent = parent
-        self.flips = flips
-        self.team_flips = team_flips
-
         self.graph = parent.graph
         self.capacity_level = parent.capacity_level
-
-        self.merged_parts = merged_ids
-        self.new_ids = new_ids
-        self.superflip = super_flip
-
-        #self.updaters = parent.updaters
+        #self.updaters = parent.updaters.copy()
+        self.flip = flip
+        self.superflip = superflip
         
-        self.flows = flows_from_changes(parent, self) 
-        self.id_flow = id_flows(self.merged_parts, self.new_ids) 
-        
+        #define a dataclass for these three functions
+        self.part_flows = compute_part_flows(superflip.merged_ids, flip.new_ids)
+        self.node_flows = compute_node_flows(parent, self)
+        self.candidate_flows = compute_candidate_flows(self)
         self.assignment = parent.assignment.copy()
-        self.assignment.update_flows(self.flows, self.id_flow, self.team_flips) 
-
-        for part in self.id_flow["in"]:
-            self.edge_flows[part] = set() # move add_districts and remove_districts functions from assignments to flows 
-        self.edge_flows = compute_edge_flows(self)
-        for part in self.id_flow["out"]:
-            self.edge_flows.pop(part, None)
-
-        self.cut_edges = cut_edges(self)
-        self.supergraph = parent.supergraph.copy()
-        update_supergraph(self, incoming_edges=self.edge_flows["in"], outgoing_edges=self.edge_flows["out"])
+        self.assignment.update_flows(self.node_flows, self.part_flows, self.flip.team_flips, self.candidate_flows)
         
+        #self.cut_edges = cut_edges(self) # done
+        self.supergraph = supergraph(self) # done
         
 
     def __repr__(self):
@@ -246,17 +224,21 @@ class Partition:
     def __len__(self):
         return len(self.parts)
 
-    def flip(self, flips: Dict, new_teams: Dict, merged_ids, new_ids, super_flip: namedtuple) -> "Partition":
+
+    def perform_flip(self, flipp: Flip, superflipp: Flip) -> "Partition":
         """
         Returns the new partition obtained by performing the given `flips` and new_teams.
         on this partition.
-
-        :param flips: dictionary assigning nodes of the graph to their new districts
-        :param new_teams: dictionary assigning resplitted districts to their new numbers of teams
-        
+        :param flip: 
+        :param superflip: 
         :returns: the new :class:`Partition`
         """
-        return self.__class__(parent=self, flips=flips, team_flips = new_teams, merged_ids = merged_ids, new_ids = new_ids, super_flip = super_flip)
+        return self.__class__(
+            parent=self,
+            flip = flipp,
+            superflip=superflipp,
+        )
+
 
     def crosses_parts(self, edge: Tuple) -> bool:
         """
@@ -268,54 +250,35 @@ class Partition:
         """
         return self.assignment.mapping[edge[0]] != self.assignment.mapping[edge[1]]
 
-    #def __getitem__(self, key: str) -> Any:
-    #    """
-    #    Allows accessing the values of updaters computed for this
-    #    Partition instance.
-
-    #    :param key: Property to access.
-    #    :type key: str
-
-    #    :returns: The value of the updater.
-    #    :rtype: Any
-    #    """
-    #    print(f"Accessing updater key: {key}")
-    #    if key not in self._cache:
-    #        print(f"Computing updater for: {key}")
-    #        self._cache[key] = self.updaters[key](self)
-    #    return self._cache[key]
+    def part_pop(self, part):
+        return sum(self.graph.nodes[node]["population"] for node in self.parts[part])
     
+    
+    def part_area(self, part):
+        return sum(self.graph.nodes[node]["area"] for node in self.parts[part])
 
-    #def __getattr__(self, key):
-    #    return self[key]
-
-    def keys(self):
-        return self.updaters.keys()
 
     @property
     def parts(self):
         return self.assignment.parts
-    
+
     @property
     def teams(self):
         return self.assignment.teams
-    
+
     @property
     def candidates(self):
         return self.assignment.candidates
-    
+
     @property
     def centers(self):
         return self.assignment.centers
-    
+
     @property
     def radius(self):
         return self.assignment.radius
-    
 
-    
 
-    
     def plot(self, geometries=None, **kwargs):
         """
         Plot the partition, using the provided geometries.
@@ -346,41 +309,138 @@ class Partition:
             {"assignment": assignment_series}, geometry=geometries
         )
         return df.plot(column="assignment", **kwargs)
-    
-    
-     
-    
-def update_supergraph(partition: Partition, incoming_edges, outgoing_edges):
-    
-    supergraph = partition.supergraph.copy()
-    
-    if not partition.parent is None: # if not initial partition
-        
-        # remove the districts that do not exist anymore (incident edges will be removed as well)
-        for district in partition.merged_parts - partition.new_ids:
-            supergraph.remove_node(district)
-        
-        # add new districts    
-        for district in partition.new_ids - partition.merged_parts:
-            supergraph.add_node(district, 
-                                population=sum(partition.graph.nodes[node][partition.column_names[0]] for node in partition.parts[district]),
-                                area=sum(partition.graph.nodes[node][partition.column_names[1]] for node in partition.parts[district]),
-                                n_teams=partition.teams[district],  # don't hold in assignments then?
-                                n_candidates=len(partition.candidates[district]))
-            
 
-    # remove old cut edges whose both endpoints still exist. If initial partition, it will be empty set
-    supergraph.remove_edges_from(outgoing_edges)
-    
-    # add new cut edges. If parent is none, all edges in cut_edges are new. 
-    for edge in incoming_edges:
-        superedge = tuple(sorted((partition.assignment.mapping[edge[0]], partition.assignment.mapping[edge[1]])))
+
+    def save(self):
+        flips = self.assignment.mapping
+        teams = self.teams
+        metadata = {"capacity_level": self.capacity_level}
+        data = {"flips": flips, "team_flips": teams, "metadata": metadata}
+        path = "/Users/kirtisoglu/Documents/Documents/GitHub/Allocation-of-Primary-Care-Centers-in-Chicago/data/processed/initial.pkl"
         
-        if superedge in supergraph.edges:
-            supergraph.edges[superedge]['edge_power'] += 1
-        else: 
-            supergraph.add_edge(superedge[0], superedge[1], edge_power=1)
+        #with open(path, "w") as f:
+        #    json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
+        save_pickle(data, path)
+        
     
-    partition.supergraph = supergraph
+    @classmethod
+    def load_partition(cls, assignment_class: Assignment):
+        
+        graph_path = "/Users/kirtisoglu/Documents/Documents/GitHub/Allocation-of-Primary-Care-Centers-in-Chicago/data/processed/graphhh.pkl"
+        partition_path = "/Users/kirtisoglu/Documents/Documents/GitHub/Allocation-of-Primary-Care-Centers-in-Chicago/data/processed/initial.pkl"
+        column_names = ['population', 'area', 'candidate', 'density']
+        
+        my_graph = load_pickle(graph_path)
+        partition = load_pickle(partition_path)
+        
+        my_graph.nodes[5158]["population"] = 100
+        my_graph.nodes[17159]["population"] = 100
+
+        return cls(capacity_level=partition["metadata"]["capacity_level"],
+                    assignment=partition["flips"],
+                    flip=Flip(flips=partition["flips"], team_flips=partition["team_flips"], new_ids=set(partition["team_flips"].keys())),
+                    graph=my_graph,)
     
     
+    
+    def plot_supergraph(self, gdf):
+        for part in self.parts:
+            district_nodes = list(self.parts[part])
+            district_gdf = gdf.loc[district_nodes]
+        return
+    
+
+
+class SupergraphError(Exception):
+    """Raised when supergraph constructed wrong."""
+
+    
+def supergraph(partition:Partition):
+    # Later, you can define this over superflips. 
+    
+    new_ones = set(partition.flip.new_ids.copy())
+    
+    if new_ones != set(partition.flip.flips.values()):
+        raise SupergraphError(f"new ids do not match with flip values.\n"
+                              f"new ids: {new_ids}\n"
+                              f"flips values: {set(partition.flip.flips.values())}")
+        
+    
+    # if flips are correct, then new ones are correct.
+    
+    # starts here
+    if partition.parent==None:  # initial partition
+        graph = nx.Graph()
+        merged = set()
+        
+    else:
+        merged =set(partition.superflip.merged_ids.copy())
+        graph = partition.parent.supergraph.copy()
+        graph.remove_nodes_from(list(merged))  # Edges has gone too.
+
+    leaving = merged - new_ones
+    if leaving != partition.part_flows["out"]:
+        raise SupergraphError(f"leaving parts {leaving} is not same as part out flow {part_flows["out"]}")
+    
+    for node in leaving:
+        if node in graph.nodes:
+            raise SupergraphError(f"leaving node {node} is still here.")
+            
+            
+    for new in new_ones:
+        if new not in partition.parts.keys():
+            raise SupergraphError(f"new_ones has an id that is not in partition.parts {new}")
+        
+
+    for part in leaving:
+        if part in partition.parts:
+            raise SupergraphError(f"part {part} is not in the partition parts")
+        
+        
+    # ---- add nodes
+    nodes = [(node, {"population":partition.part_pop(node),
+                     "area": partition.part_area(node), 
+                     "n_teams":partition.flip.team_flips[node],
+                     "n_candidates":len(partition.candidates[node])
+                    }
+              ) for node in new_ones]
+    
+    try:
+        graph.add_nodes_from(nodes)
+        
+    except Exception:
+        raise SupergraphError("couldn't add nodes to supergraph")
+
+
+    # add edges
+    add = {(node, neighbor) for node in partition.flip.flips 
+            for neighbor in partition.graph.neighbors(node)
+            #if partition.flip.flips[neighbor] not in leaving
+            }
+
+    for edge in add:
+        u,v = edge
+        uu, vv = partition.assignment.mapping[u], partition.assignment.mapping[v]
+        
+        if uu not in graph.nodes or vv not in graph.nodes:
+            raise SupergraphError(f"one of endpoints {u,v} not in supergraph.\n"
+                                  f"endpoints are {uu, vv}\n"
+                                  f"leaving is {leaving}")
+
+    try:
+        add_edges = {
+            (node, neighbor)
+            for (node, neighbor) in add
+            if partition.crosses_parts((node, neighbor))}
+    
+    except Exception:
+        raise print(f"add edges {add_edges}")
+    
+    for edge in add_edges:
+        uu = partition.assignment.mapping[edge[0]]
+        vv = partition.assignment.mapping[edge[1]]
+        graph.add_edge(uu,vv)
+
+    return graph
+
+

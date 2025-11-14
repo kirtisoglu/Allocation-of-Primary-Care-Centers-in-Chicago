@@ -1,6 +1,5 @@
 import math
 
-
 from .bounds import SelfConfiguringLowerBound, SelfConfiguringUpperBound
 
 

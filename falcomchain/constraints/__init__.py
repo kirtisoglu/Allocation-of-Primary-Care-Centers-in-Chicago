@@ -37,12 +37,12 @@ examples of this.
 """
 
 from .bounds import (
+    Bounds,
     LowerBound,
     SelfConfiguringLowerBound,
     SelfConfiguringUpperBound,
     UpperBound,
     WithinPercentRangeOfBounds,
-    Bounds,
 )
 from .compactness import (
     L1_polsby_popper,

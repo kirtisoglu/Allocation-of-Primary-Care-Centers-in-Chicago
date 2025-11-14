@@ -1,27 +1,30 @@
 import math
 from typing import Dict
+
 import numpy as np
+
 
 def squared_radius_deviation(partition):
     """
     Calculate the sum of squared deviations from the mean for radius values.
-    
-    :param p: Partition Partition class with a 'radius' attribute 
+
+    :param p: Partition Partition class with a 'radius' attribute
     :return: The sum of squared deviations from the mean
     """
     radius_array = np.array(list(partition.radius.values()))
     mean_radius = np.mean(radius_array)  # mean
-    deviations = radius_array - mean_radius # deviations from mean
-    squared_deviations = deviations ** 2 # # Square deviations
-    sum_squared_deviations = np.sum(squared_deviations) # Sum of squared deviations
+    deviations = radius_array - mean_radius  # deviations from mean
+    squared_deviations = deviations**2  # # Square deviations
+    sum_squared_deviations = np.sum(squared_deviations)  # Sum of squared deviations
     return sum_squared_deviations
+
 
 def total_cut_edges(partition):
     return len(partition["cut_edges"])
 
 
-def  arcesse_compactness(partition):
-    
+def arcesse_compactness(partition):
+
     return
 
 

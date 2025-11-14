@@ -1,9 +1,10 @@
+import random
 from heapq import heappop, heappush
 from itertools import count
+from typing import Any, Callable, Dict, Set
 
 import networkx as nx
-from typing import Callable, Any, Dict, Set
-import random
+
 from .bounds import SelfConfiguringLowerBound
 
 

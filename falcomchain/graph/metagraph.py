@@ -12,8 +12,9 @@ Last Updated: 11 Jan 2024
 """
 
 from itertools import product
+from typing import Callable, Dict, Iterable, Iterator, Union
+
 from falcomchain.constraints import Validator
-from typing import Callable, Dict, Iterator, Iterable, Union
 from falcomchain.partition import Partition
 
 
@@ -98,5 +99,3 @@ def metagraph_degree(
     :rtype: int
     """
     return len(list(all_valid_states_one_flip_away(partition, constraints)))
-
-

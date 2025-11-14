@@ -1,8 +1,9 @@
 import collections
+from typing import Dict, Set
+
+from falcomchain.partition.cut_edges import on_edge_flow
 
 from .flows import on_flow
-from falcomchain.partition.cut_edges import on_edge_flow
-from typing import Dict, Set
 
 
 def boundary_nodes(partition, alias: str = "boundary_nodes") -> Set:

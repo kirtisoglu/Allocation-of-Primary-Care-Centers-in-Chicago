@@ -1,9 +1,13 @@
-from .chain import MarkovChain
-from falcomchain.partition import Partition
-import random
-from typing import Union, Callable, List, Any
-from tqdm import tqdm
 import math
+import random
+from typing import Any, Callable, List, Union
+
+from tqdm import tqdm
+
+from falcomchain.partition import Partition
+
+from .accept import always_accept
+from .chain import MarkovChain
 
 
 class SingleMetricOptimizer:
@@ -35,7 +39,6 @@ class SingleMetricOptimizer:
         initial_state: Partition,
         optimization_metric: Callable[[Partition], Any],
         maximize: bool = True,
-        step_indexer: str = "step",
     ):
         """
 
@@ -69,13 +72,6 @@ class SingleMetricOptimizer:
         self._maximize = maximize
         self._best_part = None
         self._best_score = None
-        self._step_indexer = step_indexer
-
-        if self._step_indexer not in self._initial_part.updaters:
-            step_updater = lambda p: (
-                0 if p.parent is None else p.parent[self._step_indexer] + 1
-            )
-            self._initial_part.updaters[self._step_indexer] = step_updater
 
     @property
     def best_part(self) -> Partition:
@@ -86,7 +82,6 @@ class SingleMetricOptimizer:
         """
         return self._best_part
 
-
     @property
     def best_score(self) -> Any:
         """
@@ -95,7 +90,6 @@ class SingleMetricOptimizer:
         :return: Value of the best score.
         """
         return self._best_score
-
 
     @property
     def score(self) -> Callable[[Partition], Any]:
@@ -106,7 +100,6 @@ class SingleMetricOptimizer:
         :rtype: Callable[[Partition], Any]
         """
         return self._score
-
 
     def _is_improvement(self, new_score: float, old_score: float) -> bool:
         """
@@ -125,7 +118,6 @@ class SingleMetricOptimizer:
             return new_score >= old_score
         else:
             return new_score <= old_score
-
 
     def _tilted_acceptance_function(self, p: float) -> Callable[[Partition], bool]:
         """
@@ -152,6 +144,30 @@ class SingleMetricOptimizer:
 
         return tilted_acceptance_function
 
+    @classmethod
+    def jumpcycle_beta_function(
+        cls, duration_hot: int, duration_cold: int
+    ) -> Callable[[int], float]:
+        """
+        Class method that binds and return simple hot-cold cycle beta temperature function, where
+        the chain runs hot for some given duration and then cold for some duration, and repeats that
+        cycle.
+
+        :param duration_hot: Number of steps to run chain hot.
+        :type duration_hot: int
+        :param duration_cold: Number of steps to run chain cold.
+        :type duration_cold: int
+
+        :return: Beta function defining hot-cold cycle.
+        :rtype: Callable[[int], float]
+        """
+        cycle_length = duration_hot + duration_cold
+
+        def beta_function(step: int):
+            time_in_cycle = step % cycle_length
+            return float(time_in_cycle >= duration_hot)
+
+        return beta_function
 
     def _simulated_annealing_acceptance_function(
         self, beta_function: Callable[[int], float], beta_magnitude: float
@@ -175,13 +191,12 @@ class SingleMetricOptimizer:
             if part.parent is None:
                 return True
             score_delta = self.score(part) - self.score(part.parent)
-            beta = beta_function(part[self._step_indexer])
+            beta = beta_function(part.step)
             if self._maximize:
                 score_delta *= -1
             return random.random() < math.exp(-beta * beta_magnitude * score_delta)
 
         return simulated_annealing_acceptance_function
-
 
     def simulated_annealing(
         self,
@@ -231,7 +246,6 @@ class SingleMetricOptimizer:
                 self._best_part = part
                 self._best_score = part_score
 
-
     def tilted_run(self, num_steps: int, p: float, with_progress_bar: bool = False):
         """
         Performs a tilted run. A chain where the acceptance function always accepts better plans
@@ -268,3 +282,38 @@ class SingleMetricOptimizer:
             if self._is_improvement(part_score, self._best_score):
                 self._best_part = part
                 self._best_score = part_score
+
+    def short_bursts(
+        self,
+        burst_length: int,
+        num_bursts: int,
+        accept: Callable[[Partition], bool] = always_accept,
+        with_progress_bar: bool = False,
+    ):
+        """
+        Performs a short burst run using the instance's score function. Each burst starts at the
+        best performing plan of the previous burst. If there's a tie, the later observed one is
+        selected.
+
+        :param burst_length: Number of steps to run within each burst.
+        :type burst_length: int
+        :param num_bursts: Number of bursts to perform.
+        :type num_bursts: int
+        :param accept: Function accepting or rejecting the proposed state. Defaults to
+            :func:`~gerrychain.accept.always_accept`.
+        :type accept: Callable[[Partition], bool], optional
+        :param with_progress_bar: Whether or not to draw tqdm progress bar. Defaults to False.
+        :type with_progress_bar: bool, optional
+
+        :return: Partition generator.
+        :rtype: Generator[Partition]
+        """
+        if with_progress_bar:
+            for part in tqdm(
+                self.short_bursts(
+                    burst_length, num_bursts, accept, with_progress_bar=False
+                ),
+                total=burst_length * num_bursts,
+            ):
+                yield part
+            return

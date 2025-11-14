@@ -1,7 +1,6 @@
 from typing import Callable, Tuple
 
 
-
 class Bounds:
     """
     Wrapper for numeric-validators to enforce upper and lower limits.
@@ -12,24 +11,27 @@ class Bounds:
 
     """
 
-    def __init__(self, func: Callable, bounds: Tuple[float, float]) -> None:
+    def __init__(self, pops: dict, bounds: dict) -> None:
         """
-        :param func: Numeric validator function. Should return an iterable of values.
-        :type func: Callable
-        :param bounds: Tuple of (lower, upper) numeric bounds.
-        :type bounds: Tuple[float, float]
+        :param pop_dict:
+        :type pop_dict:
+        :param bounds_dict:
+        :type bounds_dict:
         """
-        self.func = func
+        self.pops = pops
         self.bounds = bounds
 
     def __call__(self, *args, **kwargs) -> bool:
-        lower, upper = self.bounds
-        values = self.func(*args, **kwargs)
-        return lower <= min(values) and max(values) <= upper
+        valid = True
+        for part in self.pops.keys():
+            pop = self.pops[part]
+            lower, upper = self.bounds[part]
+            valid = valid and (lower <= pop and pop <= upper)
+        return valid
 
     @property
     def __name__(self) -> str:
-        return "Bounds({},{})".format(self.func.__name__, str(self.bounds))
+        return "Bounds({},{})".format(str(self.pops), str(self.bounds))
 
     def __repr__(self) -> str:
         return "<{}>".format(self.__name__)

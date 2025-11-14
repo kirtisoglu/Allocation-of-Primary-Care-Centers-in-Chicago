@@ -1,7 +1,8 @@
-from .bounds import Bounds
-import numpy
-from typing import Callable, List, Dict
+from typing import Callable, Dict, List
 
+import numpy
+
+from .bounds import Bounds
 
 
 class Validator:
@@ -50,8 +51,6 @@ class Validator:
                 raise TypeError(
                     "Constraint {} returned a non-boolean.".format(repr(constraint))
                 )
-
-        # all constraints are satisfied
         return True
 
     def __repr__(self) -> str:
@@ -60,7 +59,7 @@ class Validator:
 
 
 def within_percent_of_ideal_population(
-    initial_partition, percent: float = 0.02, pop_key: str = "population"
+    initial_partition, percent: float = 0.1, pop_key: str = "population"
 ) -> Bounds:
     """
     Require that all districts are within a certain percent of "ideal" (i.e.,
@@ -80,24 +79,22 @@ def within_percent_of_ideal_population(
         by ``pop_key``.
     :rtype: Bounds
     """
+    ideal_population = 1500  # make this an input later.
+    bounds = {}
+    pops = {}
 
-    def population(partition):
-        pop={}
-        for node in partition.supergraph.nodes:
-            pop[node] = partition.supergraph.nodes[node]['population']
-        return pop.values()
+    for part in initial_partition.supergraph.nodes:
+        pops[part] = initial_partition.supergraph.nodes[part][pop_key]
+        hired_teams = initial_partition.teams[part]
+        bounds[part] = (
+            (1 - percent) * ideal_population * hired_teams,
+            (1 + percent) * ideal_population * hired_teams,
+        )
 
-    number_of_districts = len(initial_partition[pop_key].keys())
-    total_population = sum(initial_partition[pop_key].values())
-    ideal_population = total_population / number_of_districts
-    bounds = ((1 - percent) * ideal_population, (1 + percent) * ideal_population)
-
-    return Bounds(population, bounds=bounds)
+    return Bounds(pops, bounds=bounds)
 
 
-def deviation_from_ideal(
-    partition, attribute: str = "population"
-) -> Dict[int, float]:
+def deviation_from_ideal(partition, attribute: str = "population") -> Dict[int, float]:
     """
     Computes the deviation of the given ``attribute`` from exact equality
     among parts of the partition. Usually ``attribute`` is the population, and
@@ -151,7 +148,6 @@ def districts_within_tolerance(
 
     within_tolerance = max_difference <= percentage * min(values)
     return within_tolerance
-
 
 
 def no_vanishing_districts(partition) -> bool:

@@ -1,23 +1,17 @@
 
-from libpysal import weights
+import branca
+import branca.colormap as cm
+import folium
+import matplotlib as plt
+import matplotlib.pyplot as pltt
 import networkx as nx
 import numpy as np
-import geopandas 
-from .data_handler import DataHandler
-
 import pandas as pd
-import matplotlib as plt
-import plotly.graph_objects as go
 import plotly.express as px
-import branca.colormap as cm
-import branca
-from .data_handler import DataHandler
-
-import folium
 from folium import plugins
-import geopandas
-from datashader.colors import viridis
-import matplotlib.pyplot as pltt
+from libpysal import weights
+
+from .data_handler import DataHandler
 
 
 class Plot:
@@ -27,7 +21,7 @@ class Plot:
         handler = DataHandler()
         self.geo_data = handler.load_chicago()
         self.geo_candidates = handler.load_geo_candidates()
-
+    
 
     def basemap(self):
 
@@ -37,13 +31,114 @@ class Plot:
         fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
         
         return fig
+
+    # from tree.py
+    def plot_map(self, geo_centers, assignment, attr):
+        import folium
+        import mapclassify
+        import matplotlib
+        chicago = self.geo_data
+        chicago[attr] = [assignment[node] for node in chicago.index]
+        regions = chicago.dissolve(by=attr, as_index=False)
+
+        # m = folium.Map([41.85, -87.68], zoom_start=10)
+        m = regions.explore(
+            column=attr,  # make choropleth based on "district" column
+            tooltip=attr,  # show "district" value in tooltip (on hover)
+            popup=True,  # show all values in popup (on click)
+            tiles="OpenStreetMap",  # use "CartoDB positron" or "OpenStreetMap" tiles
+            cmap="Set1",  # use "Set1" matplotlib colormap
+            style_kwds=dict(color="black"),  # use black outline
+            legend_kwds=dict(colorbar=False),
+            # tooltip_kwds=dict(labels=False),  # do not show column label in the tooltip
+            # smooth_factor=2,
+            # fill_opacity=0.3,  #  transparency of fill colors
+            # line_opacity=0.1,  # to de-emphasize border lines
+            # fill_color="RdYlGn_r",  # or "YlGn"
+            # nan_fill_color="white", # Also see nan_fill_opacity=0.4,
+            highlight=True,
+            name="chicago",
+        )
+
+        # Adds a button to enable/disable zoom scrolling
+        folium.plugins.ScrollZoomToggler().add_to(m)
+
+        # To make the map full screen
+        folium.plugins.Fullscreen(
+            position="topright",
+            title="Expand me",
+            title_cancel="Exit me",
+            force_separate_button=True,
+        ).add_to(m)
+
+        geo_centers.explore(
+            m=m,  # pass the map object
+            color="black",  # use red color on all points
+            marker_kwds=dict(radius=3, fill=True),  # make marker radius 10px with fill
+            name="Candidates",  # name of the layer in the map
+        )
+        # folium.TileLayer("CartoDB positron", show=False).add_to(m)
+        # use folium to add alternative tiles
+        folium.LayerControl().add_to(m)  # use folium to add layer control
+
+        return m, regions, chicago, geo_centers
+
     
-    
-    def incomplete_districts():
-        return
+    def plot(self, candidates, color_value=None):
+        """
+        Plots census blocks from a GeoDataFrame with a uniform color
+        and marks given candidates (centers) on the map.
+
+        Args:
+            data (gpd.GeoDataFrame): GeoDataFrame containing census block geometries.
+            candidates (list): A list of indices from the 'data' GeoDataFrame
+                            representing the candidates (centers) to be marked.
+            color_value (str or int or float, optional): A value to assign for the color
+                                                        of the census blocks. If None,
+                                                        a default grey will be used.
+        """
+
+        data = self.geo_data
+        
+        fig = px.choropleth(
+            data,
+            geojson=data.geometry.__geo_interface__,
+            locations=data.index,
+            color='id_1',  # This must be a column name from 'data'
+            center={"lat": data.geometry.centroid.y.mean(), "lon": data.geometry.centroid.x.mean()},
+            height=800,
+            projection="mercator",
+            hover_data=['population'] if 'population' in data.columns else None # Show population data on hover if available
+        )
 
 
-    def plot(self, data, centers, attribute: str, color=None, fake_center=None):
+
+        fig = px.choropleth(df, geojson=geojson, color="winner",
+                            locations="district", featureidkey="properties.district",
+
+                        )
+        fig.update_geos(fitbounds="locations", visible=False)
+        fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+        fig.show()
+        
+        # Add specified candidates (centers) as markers
+        for candidate in candidates:
+            if candidate in data.index:
+                candidate_point = data.loc[candidate].geometry.centroid
+                fig.add_scattermapbox(
+                    lat=[candidate_point.y],
+                    lon=[candidate_point.x],
+                    mode='markers',
+                    marker=dict(size=15, color='yellow', symbol='star'),
+                    name=f'Candidate={candidate}'
+                )
+            else:
+                print(f"Warning: Candidate index '{candidate}' not found in data. Skipping marker.")
+
+        return fig.show()
+    
+
+    def plot_districts(self, data, centers, attribute: str, color=None, fake_center=None):
         # Ensure data[attribute] has appropriate type for indexing
         data[attribute] = pd.Categorical(data[attribute])
         
@@ -219,74 +314,6 @@ class Plot:
 
 
 
-    def plot_map(assignment, attr):
-        import folium
-        import matplotlib
-        import mapclassify
-
-        handler = DataHandler()
-        chicago = handler.load_chicago()
-        geo_centers = handler.load_geo_centers()  ## Define a function for that
-
-        chicago[attr] = [assignment[node] for node in chicago.index]
-        regions = chicago.dissolve(by=attr, as_index=False)
-
-        # m = folium.Map([41.85, -87.68], zoom_start=10)
-        m = regions.explore(
-            column=attr,  # make choropleth based on "district" column
-            tooltip=attr,  # show "district" value in tooltip (on hover)
-            popup=True,  # show all values in popup (on click)
-            tiles="OpenStreetMap",  # use "CartoDB positron" or "OpenStreetMap" tiles
-            cmap="Set1",  # use "Set1" matplotlib colormap
-            style_kwds=dict(color="black"),  # use black outline
-            legend_kwds=dict(colorbar=False),
-            #tooltip_kwds=dict(labels=False),  # do not show column label in the tooltip
-            #smooth_factor=2,
-            #fill_opacity=0.3,  #  transparency of fill colors
-            #line_opacity=0.1,  # to de-emphasize border lines
-            #fill_color="RdYlGn_r",  # or "YlGn"
-            #nan_fill_color="white", # Also see nan_fill_opacity=0.4,
-            highlight=True,
-            name = "chicago"
-        )
-
-        #Adds a button to enable/disable zoom scrolling
-        folium.plugins.ScrollZoomToggler().add_to(m)
-
-        # To make the map full screen
-        folium.plugins.Fullscreen(
-            position="topright",
-            title="Expand me",
-            title_cancel="Exit me",
-            force_separate_button=True,
-        ).add_to(m)
-
-
-        geo_centers.explore(
-            m=m,  # pass the map object
-            color="black",  # use red color on all points
-            marker_kwds=dict(radius=3, fill=True),  # make marker radius 10px with fill
-            name="Candidates",  # name of the layer in the map
-        )
-        #folium.TileLayer("CartoDB positron", show=False).add_to(m)  
-        # use folium to add alternative tiles
-        folium.LayerControl().add_to(m)  # use folium to add layer control
-
-
-        # Side by side Layers: control=False  to add a layer control to your map
-        #m = folium.Map(location=(30, 20), zoom_start=4)
-
-        #layer_right = folium.TileLayer('openstreetmap')
-        #layer_left = folium.TileLayer('cartodbpositron')
-
-        #sbs = folium.plugins.SideBySideLayers(layer_left=layer_left, layer_right=layer_right)
-
-        #layer_left.add_to(m)
-        #layer_right.add_to(m)
-        #sbs.add_to(m)
-
-        return m, regions, chicago, geo_centers 
-
 
 def plot_grid(graph):
 
@@ -316,3 +343,33 @@ def plot_grid(graph):
     pltt.tight_layout()
     pltt.axis("off")
     pltt.show()
+    
+    
+
+
+
+def plot_grid_with_candidates(Chicago, grid, candidates):
+    """
+    Plots the census blocks (Chicago), the spatial grid, and selected candidate blocks.
+    
+    Parameters:
+    - Chicago: GeoDataFrame of all census blocks
+    - grid: GeoDataFrame of grid cells
+    - candidates: GeoDataFrame of selected candidate blocks
+    """
+    fig, ax = plt.subplots(figsize=(12, 12))
+
+    # Plot census blocks in light gray
+    Chicago.plot(ax=ax, color='lightgray', linewidth=0.1, edgecolor='white', label='Census Blocks')
+
+    # Plot grid cells with transparent fill and black edges
+    grid.boundary.plot(ax=ax, edgecolor='black', linewidth=0.5, alpha=0.5, label='Grid Cells')
+
+    # Plot selected candidates in red
+    candidates.plot(ax=ax, color='red', label='Selected Candidates')
+
+    ax.set_title("Geographic Sampling of Census Blocks with Grid Overlay")
+    ax.axis('off')
+    ax.legend()
+    plt.tight_layout()
+    plt.show()

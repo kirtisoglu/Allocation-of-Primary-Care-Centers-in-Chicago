@@ -1,3 +1,2 @@
+from .r_wrapper import run_ttm
 from .traveltime import *
-from .network import *
-from .cta_network import *

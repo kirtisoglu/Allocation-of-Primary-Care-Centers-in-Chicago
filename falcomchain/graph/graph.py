@@ -13,17 +13,16 @@ imported as required.
 
 import functools
 import json
-from typing import Any
 import warnings
+from typing import Any, Iterable, List, Optional, Set, Tuple, Union
 
 import networkx
+import pandas as pd
 from networkx.classes.function import frozen
 from networkx.readwrite import json_graph
-import pandas as pd
 
 from .adjacency import neighbors
 from .geo import GeometryError, invalid_geometries, reprojected
-from typing import List, Iterable, Optional, Set, Tuple, Union
 
 
 def json_serialize(input_object: Any) -> Optional[int]:

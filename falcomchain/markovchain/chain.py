@@ -24,9 +24,9 @@ Dependencies:
 Last Updated: 11 Jan 2024
 """
 
-from typing import Union, Iterable, Callable, Optional
+from typing import Callable, Iterable, Optional, Union
 
-from falcomchain.constraints import Validator, Bounds
+from falcomchain.constraints import Bounds, Validator
 from falcomchain.partition import Partition
 
 

@@ -1,7 +1,5 @@
-
-from .proposals import hierarchical_recom, propose_chunk_flip, propose_random_flip
-from .optimization import SingleMetricOptimizer
-from .objectives import *
+from .accept import always_accept
 from .chain import MarkovChain
-
-
+from .objectives import *
+from .optimization import SingleMetricOptimizer
+from .proposals import hierarchical_recom, propose_chunk_flip, propose_random_flip
