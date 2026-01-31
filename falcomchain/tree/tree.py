@@ -296,7 +296,6 @@ def _part_nodes(successors, start):
                 for c in successors[next_node]:
                     if c not in nodes:
                         queue.append(c)
-
     return nodes
 
 
@@ -521,6 +520,7 @@ def bipartition_tree(
     max_attempts=5000,
     allow_pair_reselection: bool = False,  # do we need this?
     snapshot=False,
+    initial=False,
 ) -> Cut:
     """
     This function finds a balanced 2 partition of a graph by drawing a
@@ -565,6 +565,8 @@ def bipartition_tree(
             possible_cuts = find_superedge_cuts(h)
 
         if possible_cuts:
+            if snapshot == True:
+                export_tree(h, iteration, initial=initial)
             return random.choice(possible_cuts)
 
     if allow_pair_reselection:
@@ -572,9 +574,7 @@ def bipartition_tree(
             f"Failed to find a balanced cut after {max_attempts} attempts.\n"
             f"Selecting a new district pair."
         )
-    if snapshot == True:
-        if h.supertree == False:
-            export_tree(h, iteration, initial=False)
+
     raise RuntimeError(
         f"Could not find a possible cut after {max_attempts} attempts. Supergraph = {h.supertree}."
     )
@@ -627,6 +627,7 @@ def capacitated_recursive_tree(
     merged_ids=None,
     max_id=0,
     debt=None,
+    iteration=0
 ) -> Flip:
     """
      Recursively partitions a graph into balanced districts using bipartition_tree.
@@ -654,7 +655,6 @@ def capacitated_recursive_tree(
     remaining_nodes = set(graph.nodes())
     remaining_teams = n_teams
     debt = 0
-    iteration = 1
     hired_teams = 1
 
     # We keep a running tally of deviation from ``epsilon`` at each partition
@@ -762,12 +762,13 @@ def capacitated_recursive_tree(
                 debt,
                 merged_ids,
                 initial=(assignments == None),
+                superdistrict=False
             )
 
         iteration += 1
 
     # print("------ recursive function ends sucessfully.")
-
+    
     return Flip(
         flips=current_flips,
         team_flips=current_team_flips,

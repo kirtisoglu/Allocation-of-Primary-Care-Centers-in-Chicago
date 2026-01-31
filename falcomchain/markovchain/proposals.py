@@ -75,11 +75,12 @@ def hierarchical_recom(
             density=False,
             snapshot=snapshot,
             max_attempts=10,
-            iteration=0,
+            iteration=partition.step,
         )
     except Exception:
         raise
-
+    
+    
     # ("Cut", "node subnodes assigned_teams pop")
     # For now, we merge only one super district picking it randomly
     ##super_partition = {
@@ -121,8 +122,9 @@ def hierarchical_recom(
             max_id=max_id,
             pop_target=new_pop_target,
             epsilon=epsilon,
-            snapshot=False,
+            snapshot=snapshot,
             debt=(acut_object.pop - acut_object.assigned_teams * 1500),
+            iteration=partition.step
         )
     except Exception:
         raise

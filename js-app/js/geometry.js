@@ -46,3 +46,8 @@ export class GeometryUtils {
         return a > 40 && a < 43 && b < -80 && b > -90;
     }
 }
+
+// Make it globally available as a workaround
+if (typeof window !== 'undefined') {
+    window.GeometryUtils = GeometryUtils;
+}

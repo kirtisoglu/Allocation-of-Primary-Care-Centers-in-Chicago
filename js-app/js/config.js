@@ -13,8 +13,8 @@ export const CONFIG = {
         rootFill: "#ffd54f",
         rootStroke: "#333",
         linkStroke: "rgba(255,255,255,0.85)",
-        blockFill: "rgba(60,60,60,0.35)",
-        blockStroke: "rgba(100,100,100,0.6)",
+        blockFill: "rgba(80,80,80,0.7)",      // Lighter gray, more opaque for visibility
+        blockStroke: "rgba(180,180,180,0.9)", // Much lighter stroke for clear boundaries
     },
     animationDuration: 400,
     framePadding: 40,

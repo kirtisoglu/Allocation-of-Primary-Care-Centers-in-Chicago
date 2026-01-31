@@ -8,7 +8,17 @@ export class ViewManager {
     autoCenterAndScale(state) {
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
-        if (state.nodes.length) {
+        // PRIORITY 1: Use blocks bounds (these should ALWAYS exist as global background)
+        if (state.blocksBounds) {
+            minX = state.blocksBounds.minx;
+            minY = state.blocksBounds.miny;
+            maxX = state.blocksBounds.maxx;
+            maxY = state.blocksBounds.maxy;
+            console.log(`Using blocks bounds: [${minX}, ${minY}, ${maxX}, ${maxY}]`);
+        }
+
+        // PRIORITY 2: Expand bounds to include nodes if they exist
+        if (state.nodes && state.nodes.length) {
             for (const n of state.nodes) {
                 if (Number.isFinite(n.x) && Number.isFinite(n.y)) {
                     minX = Math.min(minX, n.x);
@@ -17,20 +27,18 @@ export class ViewManager {
                     maxY = Math.max(maxY, n.y);
                 }
             }
+            console.log(`Expanded for nodes: [${minX}, ${minY}, ${maxX}, ${maxY}]`);
         }
 
-        if (state.blocksBounds) {
-            minX = Math.min(minX, state.blocksBounds[0]);
-            minY = Math.min(minY, state.blocksBounds[1]);
-            maxX = Math.max(maxX, state.blocksBounds[2]);
-            maxY = Math.max(maxY, state.blocksBounds[3]);
-        }
+        console.log(`AutoCenter: Final Bounds [${minX}, ${minY}, ${maxX}, ${maxY}]`);
 
         if (!Number.isFinite(minX) || !Number.isFinite(maxX) || !Number.isFinite(minY) || !Number.isFinite(maxY)) {
+            console.warn("AutoCenter: Invalid bounds");
             return false;
         }
 
         if (!(minX < maxX && minY < maxY)) {
+            console.warn("AutoCenter: Empty bounds range");
             return false;
         }
 
@@ -48,6 +56,7 @@ export class ViewManager {
         state.transform.angle = 0;
         state.initialTransform = { ...state.transform };
 
+        console.log(`AutoCenter: Transform k=${scale}, x=${state.transform.x}, y=${state.transform.y}`);
         return true;
     }
 

@@ -50,8 +50,18 @@ def export_tree(tree, iteration, initial):
     nodes = []
     for n, a in G.nodes(data=True):
         # Add/compute the minimal fields we want in the browser
-        has_fac = bool(tree.has_facility(n))
-        compl_fac = bool(tree.complement_has_facility(n))
+        if tree.supertree == True:
+            teams = G.nodes[n]["n_teams"] # accumulated
+            attribute_one = "has_teams"
+            attribute_two = "compl_teams"
+            value_one = 2 <= teams <= tree.capacity_level
+            value_two = (2 <= tree.n_teams - teams <= tree.capacity_level or n == tree.root)
+        else: 
+            attribute_one = "has_candidate"
+            attribute_two = "compl_facility"
+            value_one = bool(tree.has_facility(n))
+            value_two = bool(tree.complement_has_facility(n))
+            
         # coordinates
         x = a.get("C_X", a.get("x", 0.0))
         y = a.get("C_Y", a.get("y", 0.0))
@@ -66,8 +76,8 @@ def export_tree(tree, iteration, initial):
                 "id": str(n),  # make IDs strings for consistency
                 "x": float(x),
                 "y": float(y),
-                "has_facility": has_fac,
-                "compl_facility": compl_fac,
+                attribute_one: value_one,
+                attribute_two: value_two,
                 **extra,
             }
         )
@@ -88,24 +98,30 @@ def export_tree(tree, iteration, initial):
     data = {"nodes": nodes, "links": links, "metadata": metadata}
 
     if initial:
-        path = "/Users/kirtisoglu/Documents/Documents/GitHub/Allocation-of-Primary-Care-Centers-in-Chicago/JS-app/data/trees"
+        tree_path = "/Users/kirtisoglu/Documents/Documents/GitHub/Allocation-of-Primary-Care-Centers-in-Chicago/JS-app/data/trees"
     else:
-        path = "/Users/kirtisoglu/Documents/Documents/GitHub/Allocation-of-Primary-Care-Centers-in-Chicago/js-app/data/int_trees"
+        tree_path = "/Users/kirtisoglu/Documents/Documents/GitHub/Allocation-of-Primary-Care-Centers-in-Chicago/js-app/data/int_trees"
 
-    base = Path(path)
+    base = Path(tree_path)
     base.mkdir(parents=True, exist_ok=True)
 
-    if initial == True and iteration == 1:
-        for p in base.glob("tree_*.json"):  # or "*.json"
+    if iteration == 1:
+        for p in base.glob("*.json"): 
             try:
                 p.unlink()
             except FileNotFoundError:
                 pass
-
-    path = base / f"tree_{iteration}.json"
+    
+    if tree.supertree == True:
+        extension = f"supertree_{iteration}.json"
+    else: 
+        extension = f"tree_{iteration}.json"
+    
+    path = base / extension
     with open(path, "w") as f:
         json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
 
+        
 
 def export_district_frame(
     root,
@@ -117,17 +133,16 @@ def export_district_frame(
     debt,
     merged_ids,
     initial,
+    superdistrict
 ):
     """
     Write one JSON file per (iteration, district).
-    - tree: your Tree instance (must have attributes used below)
+    - tree: Tree instance (must have attributes used below)
     - district_nodes: iterable of node ids (strings/ints) belonging to this district
     """
     md = {
         "iteration": int(iteration),
         "district_id": str(district_id),
-        "timestamp": datetime.datetime.utcnow().replace(microsecond=0).isoformat()
-        + "Z",
         # "ideal_pop": _py(getattr(tree, "ideal_pop", None)),
         # "epsilon": _py(getattr(tree, "epsilon", None)),
         # "n_teams": _py(getattr(tree, "n_teams", None)),
@@ -136,6 +151,7 @@ def export_district_frame(
         "hired_teams": int(hired_teams),
         "debt": float(debt),
         "merged_ids": _to_py(merged_ids),
+        "superdistrict": _to_py(superdistrict)
     }
     data = {
         "district": [str(n) for n in district_nodes],  # list of node ids
@@ -148,17 +164,22 @@ def export_district_frame(
     else:
         path = "/Users/kirtisoglu/Documents/Documents/GitHub/Allocation-of-Primary-Care-Centers-in-Chicago/js-app/data/int_districts"
 
+    if superdistrict == True:
+        extension = f"superdistrict_{iteration}.json"
+    else: 
+        extension = f"district_{iteration}.json"
+        
     base = Path(path)
     base.mkdir(parents=True, exist_ok=True)
 
-    if initial == True and iteration == 1:
-        for p in base.glob("district_*.json"):  # or "*.json"
+    if iteration == 1:
+        for p in base.glob("*.json"):  # or "*.json"
             try:
                 p.unlink()
             except FileNotFoundError:
                 pass
 
-    path = base / f"district_{iteration}.json"
+    path = base / extension
     _json_dump(path, data)
 
     """
