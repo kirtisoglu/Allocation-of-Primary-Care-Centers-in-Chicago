@@ -19,10 +19,10 @@
 #   Uniform block sampling	Throwing darts at a histogram of block counts (favoring dense areas)
 #   Grid-based sampling	Throwing darts at a map of the city, and picking blocks close to where they land
 
-# Suitable for: Representing population	Representing geography
+# Suitable for: Representing demand	Representing geography
 # Random block sample: clusters around downtown, north side.
 # Grid sample: spreads over the entire Chicago area (including southwest, southeast, etc.).
-# Represent the population/density	Uniform block sampling
+# Represent the demand/density	Uniform block sampling
 # Ensure wide spatial coverage	Grid-based sampling
 
 import json
@@ -31,11 +31,10 @@ from collections import namedtuple
 from dataclasses import dataclass, field, replace
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Set, Tuple, Union
 
+
 import geopandas as gpd
 import networkx as nx
 import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
 
 # import shapely
 from shapely.geometry import Point, Polygon, box
@@ -44,10 +43,10 @@ from falcomchain.graph.geo import reprojected
 from falcomchain.helper import save_pickle
 
 # Block tuple that is used in Cells
-Block = namedtuple("Block", "area pop factor is_real includes_centroid")
+Block = namedtuple("Block", "area demand factor is_real includes_centroid")
 Block.__doc__ = "Represents a block portion covered by a cell."
 Block.area.__doc__ = "area of the block within the cell"
-Block.pop.__doc__ = "Estimated population in this block portion within the cell."
+Block.demand.__doc__ = "Estimated demand in this block portion within the cell."
 Block.factor.__doc__ = "Sharing factor of the block's area covered by this cell."
 Block.is_real.__doc__ = "1 if the block is a real candidate, 0 otherwise."
 Block.includes_centroid.__doc__ = (
@@ -63,11 +62,11 @@ class Cell:
     Attributes:
         name: Unique identifier for the cell.
         blocks (List[dict]): Records of spatial features (e.g., census blocks) intersecting this cell.
-        pop (float): Estimated population in the cell.
+        demand (float): Estimated demand in the cell.
         candidates (list): List of node ids of artificial candidates within the cell.
     """
 
-    pop: float
+    demand: float
     needs: int
     blocks: dict = field(default_factory=dict)
 
@@ -152,12 +151,11 @@ class Cells:
                 raise AttributeError(
                     f'Oops! {blocks_gdf} does not have a "geometry" column. Pass an attribute name for geometries.'
                 )
-        if "population" not in self.blocks_gdf.columns:
+        if "demand" not in self.blocks_gdf.columns:
             raise AttributeError(
-                f"{self.blocks_gdf} must contain a 'population' column."
+                f"{self.blocks_gdf} must contain a 'demand' column."
             )
 
-        self._assign_real_candidates()  # first assign this. We will use node attributes for real candidates. Or use only geodataframe later.
         self.grid_gdf = self._create_grid_gdf()
         self.cell_blocks_gdf = self._overlay_cell_blocks()
         self.cells = self._create_cells(cell_factor, workload)
@@ -223,9 +221,6 @@ class Cells:
 
         return cell_blocks_gdf
 
-    def _assign_real_candidates(self):
-        return
-
     def _cell_blocks(self, cell_gdf) -> dict:
         """
         needs cell geo dataset
@@ -237,7 +232,7 @@ class Cells:
             block_id = row["id_2"]
             node_id = self.blocks_gdf.index[self.blocks_gdf["id"] == block_id].item()
             portion = row["area"] / self.blocks_gdf.loc[node_id]["area"]
-            sub_block_pop = portion * self.blocks_gdf.loc[node_id]["population"]
+            sub_block_pop = portion * self.blocks_gdf.loc[node_id]["demand"]
             is_real = self.graph.nodes[node_id]["real_candidate"]
 
             with_centroid = False
@@ -248,7 +243,7 @@ class Cells:
 
             cell_blocks[node_id] = Block(
                 area=row["area"],
-                pop=sub_block_pop,
+                demand=sub_block_pop,
                 factor=portion,
                 is_real=is_real,
                 includes_centroid=with_centroid,
@@ -263,12 +258,12 @@ class Cells:
         for cell, cell_gdf in grouped_gdf:
             cell_blocks = self._cell_blocks(cell_gdf)
             cell_pop = (
-                sum((float(b.pop) for b in cell_blocks.values()))
+                sum((float(b.demand) for b in cell_blocks.values()))
                 if cell_blocks
                 else 0.0
             )
             cells[cell] = Cell(
-                pop=cell_pop,
+                demand=cell_pop,
                 blocks=cell_blocks,
                 needs=cell_factor * int(-(cell_pop // -workload)),
             )
@@ -290,101 +285,8 @@ class Cells:
         return json.loads(gdf.to_json())
 
     def pop(self) -> int:
-        "total population in all cells"
-        return sum(cell.pop for cell in self.cells.values())
-
-    def plot(
-        self,
-        block_type: str = "all",
-        color_pop: bool = False,
-        candidates: Iterable[Any] | None = None,
-    ):
-        """_summary_
-
-        Args:
-            block_type (str, optional): _description_. Defaults to "all".
-            candidates (Iterable[Any] | None, optional): _description_. Defaults to None.
-
-        Returns:
-            _type_: _description_
-        """
-        # Make sure CRS is lat/lon (EPSG:4326) for Plotly
-        if block_type == "all":
-            geo_data = self.blocks_gdf
-            geojson_data = self.blocks_json()
-
-        elif block_type == "non-candidate":
-            non_candidates = [n for n in self.graph.nodes if n not in candidates]
-            geo_data = self.list_to_geodataframe(non_candidates)
-            geojson_data = self.to_json(geo_data)
-
-        if color_pop == True:
-            geo_data["pop_cat"] = geo_data["population"].apply(
-                lambda x: "Zero Population" if x == 0 else "Nonzero Population"
-            )
-
-            fig = px.choropleth_mapbox(
-                geo_data,
-                geojson=geojson_data,
-                locations=geo_data.index,  # link by index (must match GeoJSON feature 'id')
-                color="pop_cat",
-                category_orders={"pop_cat": ["Zero Population", "Nonzero Population"]},
-                color_discrete_map={
-                    "Zero Population": "yellow",
-                    "Nonzero Population": "blue",
-                },
-                mapbox_style="carto-positron",
-                center={"lat": 41.8781, "lon": -87.6298},
-                zoom=9,
-                opacity=0.6,  # OK here (Plotly Express wrapper supports it)
-                width=1200,
-                height=900,
-            )
-
-        else:
-            fig = px.choropleth_mapbox(
-                geo_data,
-                geojson=geojson_data,
-                locations=geo_data.index,  # link by index (must match GeoJSON feature 'id')
-                mapbox_style="carto-positron",
-                center={"lat": 41.8781, "lon": -87.6298},
-                zoom=9,
-                opacity=0.6,  # OK here (Plotly Express wrapper supports it)
-                width=1200,
-                height=900,
-            )
-
-        # --- Overlay: grid cell polygons (outline-only look) ---
-        grid_cells_4326 = self.grid_gdf
-        grid_cells_4326["gid"] = grid_cells_4326.index.astype(
-            str
-        )  # property to match on
-        grid_geojson = json.loads(grid_cells_4326.to_json())
-
-        fig.add_trace(
-            go.Choroplethmapbox(
-                geojson=grid_geojson,
-                featureidkey="properties.gid",
-                locations=grid_cells_4326["gid"],
-                z=np.zeros(len(grid_cells_4326)),  # dummy values
-                # transparent fill via RGBA colorscale (no 'opacity' arg on this trace type)
-                colorscale=[[0, "rgba(0,0,0,0)"], [1, "rgba(0,0,0,0)"]],
-                showscale=False,
-                marker_line_width=1.5,
-                marker_line_color="black",
-                name="Grid cells",
-                hovertemplate="Grid cell: %{location}<extra></extra>",
-                # below='' would force this layer above all mapbox layers if needed
-                # below=''
-            )
-        )
-
-        fig.update_layout(
-            title="Chicago Census Blocks + Grid Cells",
-            margin={"r": 0, "t": 40, "l": 0, "b": 0},
-        )
-
-        return fig
+        "total demand in all cells"
+        return sum(cell.demand for cell in self.cells.values())
 
     def list_to_geodataframe(self, my_list):
         gdf = self.blocks_gdf.loc[my_list]
@@ -403,41 +305,14 @@ class Cells:
         print(f"Created {candidate_type} candidates geodataframe.")
         return candidates_gdf
 
-    def plot_add_candidates(self, fig, candidate_type: str):
-
-        if candidate_type not in ["real", "artificial", "all"]:
-            raise ValueError(
-                f"which must be 'real' or 'artificial' or 'all', got {candidate_type}."
-            )
-
-        candidates_gdf = self.candidates_to_geodataframe(candidate_type=candidate_type)
-        color_map = {"real": "yellow", "artificial": "red", "all": "green"}
-
-        fig.add_trace(
-            go.Scattermapbox(
-                lat=candidates_gdf.geometry.centroid.y,
-                lon=candidates_gdf.geometry.centroid.x,
-                mode="markers",
-                marker=dict(size=8, color=color_map[candidate_type], opacity=0.5),
-                name="Candidates",
-                text=(
-                    candidates_gdf["population"]
-                    if "population" in candidates_gdf.columns
-                    else None
-                ),  # hover info
-                hoverinfo="text",
-            )
-        )
-        return fig
-
-    # optimize this function
-    def assign_artificials_to_graph(self):
+    def assign_artificials_to_graph(self, graph_path: Optional[str] = None):
         """
-        Assigns artificial candidates to the graph nodes based on the artificials dict.
+        Assigns artificial candidates to the graph nodes and optionally saves the updated graph.
 
-        Args:
-            graphhh (nx.Graph): The input graph.
-            artificials (Dict[Tuple[int,int], List[int]]): A dictionary mapping cell names to lists of block ids.
+        Sets ``artificial_candidate`` and ``candidate`` node attributes on ``self.graph``.
+
+        :param graph_path: If provided, saves the updated graph as a pickle to this path.
+        :type graph_path: str, optional
         """
         artificials = []
         for cell in self.cells.values():
@@ -449,7 +324,6 @@ class Cells:
             else:
                 self.graph.nodes[node]["artificial_candidate"] = 0
 
-        ###
         for node in self.graph.nodes:
             if (
                 self.graph.nodes[node]["artificial_candidate"] == 1
@@ -459,15 +333,19 @@ class Cells:
             else:
                 self.graph.nodes[node]["candidate"] = 0
 
-        graph_path = "/Users/kirtisoglu/Documents/Documents/GitHub/Allocation-of-Primary-Care-Centers-in-Chicago/data/processed/graphhh.pkl"
-        save_pickle(self.graph, path=graph_path)
+        if graph_path is not None:
+            save_pickle(self.graph, path=graph_path)
 
-    def save_OD_files(self):
+    def save_OD_files(self, output_dir: str):
         """
         Saves origins and destinations CSV files for travel time calculations.
-        Origins: candidate locations only.
-        Destinations: all census blocks.
+        Origins: candidate locations only. Destinations: all census blocks.
+
+        :param output_dir: Directory where ``origins.csv`` and ``destinations.csv`` will be written.
+        :type output_dir: str
         """
+        from pathlib import Path
+        output_dir = Path(output_dir)
 
         self.assign_artificials_to_graph()
         gdf = self.blocks_gdf
@@ -493,14 +371,8 @@ class Cells:
         destinations.rename(columns={"index": "id"}, inplace=True)
 
         # Save as CSV
-        origins.to_csv(
-            "/Users/kirtisoglu/Documents/Documents/GitHub/Allocation-of-Primary-Care-Centers-in-Chicago/data/network-data/origins.csv",
-            index=False,
-        )
-        destinations.to_csv(
-            "/Users/kirtisoglu/Documents/Documents/GitHub/Allocation-of-Primary-Care-Centers-in-Chicago/data/network-data/destinations.csv",
-            index=False,
-        )
+        origins.to_csv(output_dir / "origins.csv", index=False)
+        destinations.to_csv(output_dir / "destinations.csv", index=False)
 
         print("Saved origins.csv and destinations.csv")
 
@@ -510,11 +382,22 @@ class Cells:
 
 def choose_artificial_candidates(cell, cell_id, possible_blocks):
     """
-    Calculates extra number of candidates needed in each cell.
-    Randomly selects artificial candidates from non-candidate blocks
-    of graph within each cell. Returns a dict mapping cell_name to a list of block ids.
+    Selects artificial candidate locations for a single grid cell.
+
+    Calculates the number of additional candidates needed (``cell.missing``) and
+    randomly selects that many blocks from ``possible_blocks``. If fewer blocks are
+    available than needed, all possible blocks are selected.
+
+    :param cell: The grid cell to fill with artificial candidates.
+    :type cell: Cell
+    :param cell_id: Identifier of the cell, used for logging.
+    :param possible_blocks: Blocks eligible to be selected as artificial candidates
+        (excludes already-selected ones from other cells).
+    :type possible_blocks: set
+    :returns: List of node IDs chosen as artificial candidates for this cell.
+    :rtype: list
     """
-    print(f"Started choosing artificial candidates ramdomly for cell {cell_id}...")
+    print(f"Started choosing artificial candidates randomly for cell {cell_id}...")
     print(
         f"Cell {cell_id} needs {cell.missing} artificial candidates and {len(possible_blocks)} possible blocks left."
     )
@@ -540,7 +423,18 @@ def choose_artificial_candidates(cell, cell_id, possible_blocks):
 
 
 def assign_artificial_candidates(cells: Cells):
-    """"""
+    """
+    Assigns artificial candidates to all cells in the grid, ensuring no block is
+    selected as an artificial candidate in more than one cell.
+
+    Iterates over cells in order, subtracts already-selected nodes from each cell's
+    possible blocks, then calls :func:`choose_artificial_candidates` for each cell.
+
+    :param cells: The grid of cells to process.
+    :type cells: Cells
+    :returns: The updated ``Cells`` object with artificial candidates assigned.
+    :rtype: Cells
+    """
     selected_artificials = set()
     i = 1
     num_iterations = len(cells.cells)
@@ -561,69 +455,6 @@ def assign_artificial_candidates(cells: Cells):
         i += 1
     return cells
 
-
-def calculate_travel_times(graphhh):
-    ### special nodes
-    graphhh.nodes[32588]["candidate"] = 0
-    graphhh.nodes[32588]["artificial_candidate"] = 0
-
-    import runpy
-
-    def run_mod():
-        runpy.run_module("my_module", run_name="__main__")
-
-    return
-
-
-def from_real_datasets(
-    graph: nx.Graph,
-    df: gpd.GeoDataFrame,
-    candidate_df: gpd.GeoDataFrame,
-    coordinate_attr: str,
-    geo_artificial_candidates: Optional[bool] = True,
-    workload=1500,
-    save_graph_to: Optional[str] = None,
-    save_data_to: Optional[str] = None,
-):
-    """
-    Args:
-        df (gpd.GeoDataFrame): A Geopandas dataframe of census units.
-        graph (Graph): A NetworkX graph.
-        candidate.df (gpd.GeoDataFrame): A Geopandas dataframe of candidate locations
-        coordinate_attr (str): Node attribute name for coordinates.
-        save (str):
-    Returns:
-        None
-    """
-
-    real_candidates = Candidates.real_candidates(df, candidate_df, coordinate_attr)
-    for node in graph.nodes:
-        if node in real_candidates:
-            graph.nodes[node]["real_candidate"] = 1
-        else:
-            graph.nodes[node]["real_candidate"] = 0
-
-    if geo_artificial_candidates == True:
-        artificial_candidates = artificial_candidates(df, graph, workload)
-        for node in graph.nodes:
-            if node in artificial_candidates:
-                graph.nodes[node]["artificial_candidate"] = 1
-            else:
-                graph.nodes[node]["artificial_candidate"] = 0
-
-        for node, data in graph.nodes:
-            if data["real_candidate"] == 1 or data["artificial_candidate"] == 1:
-                graph.nodes[node]["candidate"] = 1
-            else:
-                graph.nodes[node]["candidate"] = 0
-
-        if save_graph_to != None:
-            save_pickle(graph, save_graph_to)
-        if save_data_to != None:
-            save_pickle(df, save_data_to)
-
-        if save_graph_to is None and save_data_to is None:
-            return graph
 
 
 def random_weighted(
@@ -680,4 +511,12 @@ def random_weighted(
 
 
 def random_uniformly(nodes: list, num_candidates: int):
+    """
+    Selects ``num_candidates`` nodes uniformly at random without replacement.
+
+    :param nodes: List of node IDs to sample from.
+    :param num_candidates: Number of candidates to select.
+    :returns: A set of selected node IDs.
+    :rtype: set
+    """
     return set(random.sample(population=nodes, k=num_candidates))

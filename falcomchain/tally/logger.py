@@ -15,7 +15,7 @@ Classes:
 Typical usage:
     logger = TreeCutTally(path="logs/treecut.json")
     logger.log_spanning_tree(edges, meta)
-    logger.log_cut(CutLog(node, pop, facility))
+    logger.log_cut(CutLog(node, demand, facility))
     logger.log_accepted_cut(AcceptedCutStep(...))
     logger.mark_accepted_nodes(accepted_nodes)
     logger.save()
@@ -39,7 +39,7 @@ from falcomchain.tree import Cut
 #
 # recursion = {recursion_info: dictionary, recursion: list[steps]} and
 #
-# recursion_info = {'target_pop': float, 'epsilon': float, 'n_teams': int,
+# recursion_info = {'target_demand': float, 'epsilon': float, 'n_teams': int,
 #                          'two_sided': bool, 'selected_cut': tuple, 'debt': float,
 #                          'remaining_ids': set, 'hired_teams': int,
 #                          'district_id': int}
@@ -49,10 +49,10 @@ from falcomchain.tree import Cut
 #
 #   step = {tree: dict, cut_nodes: list}
 #
-#       tree: {edges: set(), ideal_pop: float, n_teams: int, two_sided: bool, root, epsilon, pop_target}
+#       tree: {edges: set(), ideal_demand: float, n_teams: int, two_sided: bool, root, epsilon, demand_target}
 #       selected_nodes: list(Cut)
 
-#           node: {pop: int, facility: bool, complement: bool, accepted: int}
+#           node: {demand: int, facility: bool, complement: bool, accepted: int}
 
 #               if accepted = -1, then not accepted. Else, it is the district id.
 #               n_teams?
@@ -83,14 +83,14 @@ class CutLog:
 
     Attributes:
     - node (tuple): ID of the evaluated node
-    - pop (int): Population in the subtree beneath 'node'
+    - demand (int): Demand in the subtree beneath 'node'
     - facility (int): Facility count in the subtree
     - accepted (bool): Whether this cut was accepted
     """
 
     node: Tuple
     subnodes: list
-    pop: int
+    demand: int
     facility: int
     accepted: str
 
@@ -100,7 +100,7 @@ class CutLog:
         return cls(
             node=cut.node,
             subnodes=cut.subnodes,
-            pop=cut.pop,
+            demand=cut.demand,
             facility=cut.facility,
             accepted=cut.accepted,
         )
@@ -164,7 +164,7 @@ class StepLog:
 
 @dataclass
 class RecursionLog:
-    target_pop: float
+    target_demand: float
     epsilon: float
     n_teams: float
     two_sided: bool
@@ -180,7 +180,7 @@ class RecursionLog:
 
     def to_dict(self):
         return {
-            "target_pop": self.target_pop,
+            "target_demand": self.target_demand,
             "epsilon": self.epsilon,
             "n_teams": self.n_teams,
             "two_sided": self.two_sided,
@@ -207,7 +207,7 @@ class StateLog:
 
     def add_recursion(
         self,
-        target_pop,
+        target_demand,
         epsilon,
         n_teams,
         two_sided,
@@ -219,7 +219,7 @@ class StateLog:
     ):
         self.recursions.append(
             RecursionLog(
-                target_pop,
+                target_demand,
                 epsilon,
                 n_teams,
                 two_sided,
@@ -356,7 +356,7 @@ class ChainLog:
                             "cut_node": recursion.cut_node,
                             "tree_root": step.tree.root,
                             "n_cut_nodes": len(step.cut_nodes),
-                            "target_pop": recursion.target_pop,
+                            "target_demand": recursion.target_demand,
                             "district_id": recursion.district_id,
                         }
                     )
@@ -371,7 +371,7 @@ class ChainLog:
                         {
                             "state_index": state_index,
                             "district_id": recursion.district_id,
-                            "target_pop": recursion.target_pop,
+                            "target_demand": recursion.target_demand,
                             "num_steps": len(recursion.steps),
                         }
                     )

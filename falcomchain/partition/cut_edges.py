@@ -20,7 +20,7 @@ from .flows import neighbor_flips
 def new_cuts(partition) -> Set[Tuple]:
 
     :param partition: A partition of a Graph
-    :type partition: :class:`~gerrychain.partition.Partition`
+    :type partition: :class:`~falcomchain.partition.Partition`
 
     :returns: The set of edges that were not cut, but now are.
     :rtype: Set[Tuple]
@@ -36,7 +36,7 @@ def new_cuts(partition) -> Set[Tuple]:
 """def obsolete_cuts(partition) -> Set[Tuple]:
 
     :param partition: A partition of a Graph
-    :type partition: :class:`~gerrychain.partition.Partition`
+    :type partition: :class:`~falcomchain.partition.Partition`
 
     :returns: The set of edges that were cut, but now are not.
     :rtype: Set[Tuple]
@@ -53,7 +53,7 @@ def new_cuts(partition) -> Set[Tuple]:
 def cut_edges(partition):
     
     :param partition: A partition of a Graph
-    :type partition: :class:`~gerrychain.partition.Partition`
+    :type partition: :class:`~falcomchain.partition.Partition`
 
     :returns: The set of edges that are cut by the given partition.
     :rtype: Set[Tuple]

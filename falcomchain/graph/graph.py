@@ -151,14 +151,11 @@ class Graph(networkx.Graph):
         .. Warning::
 
             This method requires the optional ``geopandas`` dependency.
-            So please install ``gerrychain`` with the ``geo`` extra
-            via the command:
+            This method requires ``geopandas``. Install it with:
 
             .. code-block:: console
 
-                pip install gerrychain[geo]
-
-            or install ``geopandas`` separately.
+                pip install geopandas
         """
         import geopandas as gp
 
@@ -238,7 +235,7 @@ class Graph(networkx.Graph):
             df = reprojected(dataframe)
             if ignore_errors:
                 invalid_reproj = invalid_geometries(df)
-                print(invalid_reproj)
+                warnings.warn(f"Invalid geometries after reprojection: {invalid_reproj}")
                 if len(invalid_reproj) > 0:
                     raise GeometryError(
                         "Invalid geometries at rows {} after "

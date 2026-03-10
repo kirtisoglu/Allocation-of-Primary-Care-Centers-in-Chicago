@@ -8,7 +8,7 @@ Key Components:
 
 - MarkovChain: The main class used for creating and iterating over Markov chain states.
 - Validator: A helper class for validating proposed states in the Markov chain. See
-  :class:`~gerrychain.constraints.Validator` for more details.
+  :class:`~falcomchain.constraints.Validator` for more details.
 
 
 Usage:
@@ -61,13 +61,13 @@ class MarkovChain:
         :type proposal: Callable
         :param constraints: A function with signature ``Partition -> bool`` determining whether
             the proposed next state is valid (passes all binary constraints). Usually
-            this is a :class:`~gerrychain.constraints.Validator` class instance.
+            this is a :class:`~falcomchain.constraints.Validator` class instance.
         :type constraints: Union[Iterable[Callable], Validator, Iterable[Bounds], Callable]
         :param accept: Function accepting or rejecting the proposed state. In the most basic
             use case, this always returns ``True``. But if the user wanted to use a
             Metropolis-Hastings acceptance rule, this is where you would implement it.
         :type accept: Callable
-        :param initial_state: Initial :class:`gerrychain.partition.Partition` class.
+        :param initial_state: Initial :class:`falcomchain.partition.Partition` class.
         :type initial_state: Partition
         :param total_steps: Number of steps to run.
         :type total_steps: int

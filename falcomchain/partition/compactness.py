@@ -9,7 +9,7 @@ from .flows import on_flow
 def boundary_nodes(partition, alias: str = "boundary_nodes") -> Set:
     """
     :param partition: A partition of a Graph
-    :type partition: :class:`~gerrychain.partition.Partition`
+    :type partition: :class:`~falcomchain.partition.Partition`
     :param alias: The name of the attribute that the boundary nodes are
         stored under. Default is 'boundary_nodes'.
     :type alias: str, optional
@@ -29,7 +29,7 @@ def boundary_nodes(partition, alias: str = "boundary_nodes") -> Set:
 def initialize_exterior_boundaries_as_a_set(partition) -> Dict[int, Set]:
     """
     :param partition: A partition of a Graph
-    :type partition: :class:`~gerrychain.partition.Partition`
+    :type partition: :class:`~falcomchain.partition.Partition`
 
     :returns: A dictionary mapping each part of a partition to the set of nodes
         in that part that are on the boundary.
@@ -49,7 +49,7 @@ def exterior_boundaries_as_a_set(
     Updater function that responds to the flow of nodes between different partitions.
 
     :param partition: A partition of a Graph
-    :type partition: :class:`~gerrychain.partition.Partition`
+    :type partition: :class:`~falcomchain.partition.Partition`
     :param previous: The previous set of exterior boundary nodes for a
         fixed part of the given partition.
     :type previous: Set
@@ -71,7 +71,7 @@ def exterior_boundaries_as_a_set(
 def initialize_exterior_boundaries(partition) -> Dict[int, float]:
     """
     :param partition: A partition of a Graph
-    :type partition: :class:`~gerrychain.partition.Partition`
+    :type partition: :class:`~falcomchain.partition.Partition`
 
     :returns: A dictionary mapping each part of a partition to the total
         perimeter of the boundary nodes in that part.
@@ -91,7 +91,7 @@ def exterior_boundaries(partition, previous: Set, inflow: Set, outflow: Set) -> 
     Updater function that responds to the flow of nodes between different partitions.
 
     :param partition: A partition of a Graph
-    :type partition: :class:`~gerrychain.partition.Partition`
+    :type partition: :class:`~falcomchain.partition.Partition`
     :param previous: The previous set of exterior boundary nodes for a
         fixed part of the given partition.
     :type previous: Set
@@ -121,7 +121,7 @@ def exterior_boundaries(partition, previous: Set, inflow: Set, outflow: Set) -> 
 def initialize_interior_boundaries(partition):
     """
     :param partition: A partition of a Graph
-    :type partition: :class:`~gerrychain.partition.Partition`
+    :type partition: :class:`~falcomchain.partition.Partition`
 
     :returns: A dictionary mapping each part of a partition to the total
         perimeter the given part shares with other parts.
@@ -144,7 +144,7 @@ def interior_boundaries(
     Updater function that responds to the flow of nodes between different partitions.
 
     :param partition: A partition of a Graph
-    :type partition: :class:`~gerrychain.partition.Partition`
+    :type partition: :class:`~falcomchain.partition.Partition`
     :param previous: The previous set of exterior boundary nodes for a
         fixed part of the given partition.
     :type previous: Set
@@ -172,7 +172,7 @@ def interior_boundaries(
 def flips(partition) -> Dict:
     """
     :param partition: A partition of a Graph
-    :type partition: :class:`~gerrychain.partition.Partition`
+    :type partition: :class:`~falcomchain.partition.Partition`
 
     :returns: The flips that were made to get from the parent partition to the
         given partition.
@@ -191,7 +191,7 @@ def perimeter_of_part(partition, part: int) -> float:
         attribute, 'cut_edges' be an updater, and 'exterior_boundaries' be an updater.
 
     :param partition: A partition of a Graph
-    :type partition: :class:`~gerrychain.partition.Partition`
+    :type partition: :class:`~falcomchain.partition.Partition`
     :param part: The id of the part of the partition whose perimeter we want to compute.
     :type part: int
 
@@ -207,7 +207,7 @@ def perimeter_of_part(partition, part: int) -> float:
 def perimeter(partition) -> Dict[int, float]:
     """
     :param partition: A partition of a Graph
-    :type partition: :class:`~gerrychain.partition.Partition`
+    :type partition: :class:`~falcomchain.partition.Partition`
 
     :returns: A dictionary mapping each part of a partition to its perimeter.
     :rtype: Dict[int, float]

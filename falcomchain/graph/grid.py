@@ -8,7 +8,7 @@ Dependencies:
 
 - math: For math.floor() function.
 - networkx: For graph operations with using the graph structure in
-    :class:`~gerrychain.graph.Graph`.
+    :class:`~falcomchain.graph.Graph`.
 - typing: Used for type hints.
 """
 
@@ -18,7 +18,7 @@ from typing import Any, Callable, Dict, Optional, Tuple
 
 import networkx
 
-from falcomchain.graph import Graph
+from .graph import Graph
 from falcomchain.markovchain import polsby_popper
 from falcomchain.partition import Partition
 
@@ -34,7 +34,7 @@ class Grid:
         grid = Grid((10,10))
 
     The nodes of ``grid.graph`` are labelled by numbers from 1 to m x n where m, n are dimensions.
-    Node attributes: area, C_X, C_Y, population, candidate
+    Node attributes: area, C_X, C_Y, demand, candidate
     Edge attributes: shared_perimeter
     """
 
@@ -98,7 +98,7 @@ class Grid:
 
         networkx.set_edge_attributes(graph, 1, "shared_perim")
 
-        networkx.set_node_attributes(graph, 50, "population")
+        networkx.set_node_attributes(graph, 50, "demand")
         networkx.set_node_attributes(graph, 1, "C_X")
         networkx.set_node_attributes(graph, 1, "C_Y")
         networkx.set_node_attributes(graph, 1, "area")
@@ -216,11 +216,11 @@ class Grid:
             for node in self.graph.nodes:
                 x, y = node
                 if x >= threshold[0] and y >= threshold[1]:
-                    self.graph.nodes[node]["population"] = 70
+                    self.graph.nodes[node]["demand"] = 70
                 elif x < threshold[0] and y < threshold[1]:
-                    self.graph.nodes[node]["population"] = 70
+                    self.graph.nodes[node]["demand"] = 70
                 else:
-                    self.graph.nodes[node]["population"] = 30
+                    self.graph.nodes[node]["demand"] = 30
 
         if self.density == "corners":
             k_1, k_2 = threshold
@@ -228,6 +228,6 @@ class Grid:
             for node in self.graph.nodes:
                 x, y = node
                 if k_1 <= x < m - k_1 or k_2 <= y < n - k_2:
-                    self.graph.nodes[node]["population"] = 30
+                    self.graph.nodes[node]["demand"] = 30
                 else:
-                    self.graph.nodes[node]["population"] = 70
+                    self.graph.nodes[node]["demand"] = 70

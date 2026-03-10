@@ -22,7 +22,7 @@ from typing import Callable, Dict, Set, Tuple
 def neighbor_flips(partition) -> Set[Tuple]:
     """
     :param partition: A partition of a Graph
-    :type partition: :class:`~gerrychain.partition.Partition`
+    :type partition: :class:`~falcomchain.partition.Partition`
 
     :returns: The set of edges that were flipped in the given partition.
     :rtype: Set[Tuple]
@@ -121,9 +121,9 @@ def on_flow(initializer: Callable, alias: str) -> Callable:
 def compute_node_flows(old_partition, new_partition) -> Dict:
     """
     :param old_partition: A partition of a Graph representing dz    the previous step.
-    :type old_partition: :class:`~gerrychain.partition.Partition`
+    :type old_partition: :class:`~falcomchain.partition.Partition`
     :param new_partition: A partition of a Graph representing the current step.
-    :type new_partition: :class:`~gerrychain.partition.Partition`
+    :type new_partition: :class:`~falcomchain.partition.Partition`
 
     :returns: A dictionary mapping each node that changed assignment between
         the previous and current partitions to a dictionary of the form

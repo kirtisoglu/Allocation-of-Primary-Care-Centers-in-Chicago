@@ -24,9 +24,9 @@ class Partition:
     aggregations and calculations that we want to optimize.
 
     :ivar graph: The underlying graph.
-    :type graph: :class:`~gerrychain.Graph`
+    :type graph: :class:`~falcomchain.graph.Graph`
     :ivar assignment: Maps node IDs to district IDs.
-    :type assignment: :class:`~gerrychain.assignment.Assignment`
+    :type assignment: :class:`~falcomchain.partition.assignment.Assignment`
     :ivar parts: Maps district IDs to the set of nodes in that district.
     :type parts: Dict
     :ivar subgraphs: Maps district IDs to the induced subgraph of that district.
@@ -89,7 +89,7 @@ class Partition:
         cls,
         graph: Graph,
         epsilon: float,
-        pop_target: int,
+        demand_target: int,
         assignment_class: Assignment,
         #updaters: Optional[Dict[str, Callable]] = None,
         #use_default_updaters: bool = True,
@@ -101,7 +101,7 @@ class Partition:
         Create a Partition with a random assignment of nodes to districts.
 
         :param graph: The graph to create the Partition from.
-        :type graph: :class:`~gerrychain.Graph`
+        :type graph: :class:`~falcomchain.graph.Graph`
         :param teams:The total of number of doctor-nurse teams to hire at centers
         :type teams: int
         :param capacity_level: The maximum number of doctor nurse teams at a facility
@@ -109,27 +109,27 @@ class Partition:
         :param epsilon: The maximum relative population deviation from the ideal
         :type epsilon: float
             population. Should be in [0,1].
-        :param pop_col: The column of the graph's node data that holds the population data.
-        :type pop_col: str
+        :param demand_col: The column of the graph's node data that holds the demand data.
+        :type demand_col: str
         :param updaters: Dictionary of updaters
         :type updaters: Optional[Dict[str, Callable]], optional
         :param use_default_updaters: If `False`, do not include default updaters.
         :type use_default_updaters: bool, optional
         :param method: The function to use to partition the graph into ``n_parts``. Defaults to
-            :func:`~gerrychain.tree.recursive_tree_part`.
+            :func:`~falcomchain.tree.capacitated_recursive_tree`.
         :type method: Callable, optional
 
         :returns: The partition created with a random assignment
         :rtype: Partition
         """
-        total_pop = sum(graph.nodes[n]["population"] for n in graph)
-        n_teams = int(total_pop // pop_target)
+        total_pop = sum(graph.nodes[n]["demand"] for n in graph)
+        n_teams = int(total_pop // demand_target)
         # if capacity_level is 1, n_teams becomes number of districts.
 
         flip = capacitated_recursive_tree(
             graph=graph,
             n_teams=n_teams,
-            pop_target=pop_target,
+            demand_target=demand_target,
             epsilon=epsilon,
             capacity_level=capacity_level,
             density=density,
@@ -250,8 +250,8 @@ class Partition:
         """
         return self.assignment.mapping[edge[0]] != self.assignment.mapping[edge[1]]
 
-    def part_pop(self, part):
-        return sum(self.graph.nodes[node]["population"] for node in self.parts[part])
+    def part_demand(self, part):
+        return sum(self.graph.nodes[node]["demand"] for node in self.parts[part])
     
     
     def part_area(self, part):
@@ -279,78 +279,47 @@ class Partition:
         return self.assignment.radius
 
 
-    def plot(self, geometries=None, **kwargs):
+    def save(self, path: str):
         """
-        Plot the partition, using the provided geometries.
+        Serializes the partition's assignment, team allocations, and metadata to a pickle file.
 
-        :param geometries: A :class:`geopandas.GeoDataFrame` or :class:`geopandas.GeoSeries`
-            holding the geometries to use for plotting. Its :class:`~pandas.Index` should match
-            the node labels of the partition's underlying :class:`~gerrychain.Graph`.
-        :type geometries: geopandas.GeoDataFrame or geopandas.GeoSeries
-        :param `**kwargs`: Additional arguments to pass to :meth:`geopandas.GeoDataFrame.plot`
-            to adjust the plot.
-
-        :returns: The matplotlib axes object. Which plots the Partition.
-        :rtype: matplotlib.axes.Axes
+        :param path: File path to write to.
+        :type path: str
         """
-        import geopandas
-
-        if geometries is None:
-            geometries = self.graph.geometry
-
-        if set(geometries.index) != set(self.graph.nodes):
-            raise TypeError(
-                "The provided geometries do not match the nodes of the graph."
-            )
-        assignment_series = self.assignment.to_series()
-        if isinstance(geometries, geopandas.GeoDataFrame):
-            geometries = geometries.geometry
-        df = geopandas.GeoDataFrame(
-            {"assignment": assignment_series}, geometry=geometries
-        )
-        return df.plot(column="assignment", **kwargs)
-
-
-    def save(self):
         flips = self.assignment.mapping
         teams = self.teams
         metadata = {"capacity_level": self.capacity_level}
         data = {"flips": flips, "team_flips": teams, "metadata": metadata}
-        path = "/Users/kirtisoglu/Documents/Documents/GitHub/Allocation-of-Primary-Care-Centers-in-Chicago/data/processed/initial.pkl"
-        
-        #with open(path, "w") as f:
-        #    json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
         save_pickle(data, path)
-        
-    
+
     @classmethod
-    def load_partition(cls, assignment_class: Assignment):
-        
-        graph_path = "/Users/kirtisoglu/Documents/Documents/GitHub/Allocation-of-Primary-Care-Centers-in-Chicago/data/processed/graphhh.pkl"
-        partition_path = "/Users/kirtisoglu/Documents/Documents/GitHub/Allocation-of-Primary-Care-Centers-in-Chicago/data/processed/initial.pkl"
-        column_names = ['population', 'area', 'candidate', 'density']
-        
+    def load_partition(cls, graph_path: str, partition_path: str):
+        """
+        Loads a partition from saved graph and partition pickle files.
+
+        :param graph_path: Path to the saved graph pickle file.
+        :type graph_path: str
+        :param partition_path: Path to the saved partition pickle file.
+        :type partition_path: str
+        :returns: A restored Partition instance.
+        :rtype: Partition
+        """
         my_graph = load_pickle(graph_path)
         partition = load_pickle(partition_path)
-        
-        my_graph.nodes[5158]["population"] = 100
-        my_graph.nodes[17159]["population"] = 100
 
-        return cls(capacity_level=partition["metadata"]["capacity_level"],
-                    assignment=partition["flips"],
-                    flip=Flip(flips=partition["flips"], team_flips=partition["team_flips"], new_ids=set(partition["team_flips"].keys())),
-                    graph=my_graph,)
+        return cls(
+            capacity_level=partition["metadata"]["capacity_level"],
+            assignment=partition["flips"],
+            flip=Flip(
+                flips=partition["flips"],
+                team_flips=partition["team_flips"],
+                new_ids=set(partition["team_flips"].keys()),
+            ),
+            graph=my_graph,
+        )
     
     
     
-    def plot_supergraph(self, gdf):
-        for part in self.parts:
-            district_nodes = list(self.parts[part])
-            district_gdf = gdf.loc[district_nodes]
-        return
-    
-
-
 class SupergraphError(Exception):
     """Raised when supergraph constructed wrong."""
 
@@ -362,7 +331,7 @@ def supergraph(partition:Partition):
     
     if new_ones != set(partition.flip.flips.values()):
         raise SupergraphError(f"new ids do not match with flip values.\n"
-                              f"new ids: {new_ids}\n"
+                              f"new ids: {new_ones}\n"
                               f"flips values: {set(partition.flip.flips.values())}")
         
     
@@ -380,7 +349,7 @@ def supergraph(partition:Partition):
 
     leaving = merged - new_ones
     if leaving != partition.part_flows["out"]:
-        raise SupergraphError(f"leaving parts {leaving} is not same as part out flow {part_flows["out"]}")
+        raise SupergraphError(f"leaving parts {leaving} is not same as part out flow {partition.part_flows['out']}")
     
     for node in leaving:
         if node in graph.nodes:
@@ -398,7 +367,7 @@ def supergraph(partition:Partition):
         
         
     # ---- add nodes
-    nodes = [(node, {"population":partition.part_pop(node),
+    nodes = [(node, {"demand":partition.part_demand(node),
                      "area": partition.part_area(node), 
                      "n_teams":partition.flip.team_flips[node],
                      "n_candidates":len(partition.candidates[node])

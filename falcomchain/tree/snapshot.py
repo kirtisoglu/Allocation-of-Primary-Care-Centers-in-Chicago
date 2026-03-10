@@ -85,13 +85,13 @@ def export_tree(tree, iteration, initial):
     links = [{"source": str(u), "target": str(v)} for u, v in G.edges()]
     # Metadata as a dict (cast scalars)
     metadata = {
-        "ideal_pop": _to_py(getattr(tree, "ideal_pop", None)),
+        "ideal_demand": _to_py(getattr(tree, "ideal_demand", None)),
         "root": str(getattr(tree, "root", "")),
         "n_teams": _to_py(getattr(tree, "n_teams", None)),
         "epsilon": _to_py(getattr(tree, "epsilon", None)),
         "two_sided": _to_py(getattr(tree, "two_sided", None)),
         "tot_candidates": _to_py(getattr(tree, "tot_candidates", None)),
-        "tot_pop": _to_py(getattr(tree, "tot_pop", None)),
+        "total_demand": _to_py(getattr(tree, "total_demand", None)),
         "supergraph": _to_py(getattr(tree, "supertree", None)),
     }
 
@@ -128,7 +128,7 @@ def export_district_frame(
     iteration,
     district_nodes,
     hired_teams,
-    pop,
+    demand,
     district_id,
     debt,
     merged_ids,
@@ -143,11 +143,11 @@ def export_district_frame(
     md = {
         "iteration": int(iteration),
         "district_id": str(district_id),
-        # "ideal_pop": _py(getattr(tree, "ideal_pop", None)),
+        # "ideal_demand": _py(getattr(tree, "ideal_demand", None)),
         # "epsilon": _py(getattr(tree, "epsilon", None)),
         # "n_teams": _py(getattr(tree, "n_teams", None)),
         "root": _to_py(root),
-        "tot_pop": int(pop),
+        "total_demand": int(demand),
         "hired_teams": int(hired_teams),
         "debt": float(debt),
         "merged_ids": _to_py(merged_ids),

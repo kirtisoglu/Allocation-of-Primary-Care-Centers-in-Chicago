@@ -12,3 +12,8 @@ notes
 .gitignore
 tests
 rjavaenv
+cache/
+*.log
+.claude/
+docs/
+memory/

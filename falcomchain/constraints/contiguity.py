@@ -68,7 +68,7 @@ def single_flip_contiguous(partition) -> bool:
     Check if swapping the given node from its old assignment disconnects the
     old assignment class.
 
-    :param partition: The proposed next :class:`~gerrychain.partition.Partition`
+    :param partition: The proposed next :class:`~falcomchain.partition.Partition`
     :type partition: Partition
 
     :returns: whether the partition is contiguous
@@ -142,7 +142,7 @@ def affected_parts(partition) -> Set[int]:
     """
     Checks which partitions were affected by the change of nodes.
 
-    :param partition: The proposed next :class:`~gerrychain.partition.Partition`
+    :param partition: The proposed next :class:`~falcomchain.partition.Partition`
     :type partition: Partition
 
     :returns: The set of IDs of all parts that gained or lost a node
@@ -170,7 +170,7 @@ def contiguous(partition) -> bool:
     """
     Check if the parts of a partition are connected using :func:`networkx.is_connected`.
 
-    :param partition: The proposed next :class:`~gerrychain.partition.Partition`
+    :param partition: The proposed next :class:`~falcomchain.partition.Partition`
     :type partition: Partition
 
     :returns: Whether the partition is contiguous

@@ -46,7 +46,7 @@ class SingleMetricOptimizer:
         :type proposal: Callable
         :param constraints: A function, or lists of functions, determining whether the proposed next
             state is valid (passes all binary constraints). Usually this is a
-            :class:`~gerrychain.constraints.Validator` class instance.
+            :class:`~falcomchain.constraints.Validator` class instance.
         :type constraints: Union[Callable[[Partition], bool], List[Callable[[Partition], bool]]]
         :param initial_state: Initial state of the optimizer.
         :type initial_state: Partition
@@ -300,7 +300,7 @@ class SingleMetricOptimizer:
         :param num_bursts: Number of bursts to perform.
         :type num_bursts: int
         :param accept: Function accepting or rejecting the proposed state. Defaults to
-            :func:`~gerrychain.accept.always_accept`.
+            :func:`~falcomchain.markovchain.always_accept`.
         :type accept: Callable[[Partition], bool], optional
         :param with_progress_bar: Whether or not to draw tqdm progress bar. Defaults to False.
         :type with_progress_bar: bool, optional

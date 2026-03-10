@@ -1,87 +1,90 @@
-# Capacitated Facility Location with a Case Study of Chicago Healthcare Accessibility Network
+# falcomchain
 
-This project tackles the complex challenge of the capacitated facility location problem on large-scale data by using advanced optimization algorithms. We provide an efficient method for real-world scenarios with potential applications across various sectors including healthcare, retail, and public services.
+A Python library for **capacitated facility location** via Markov Chain Monte Carlo (MCMC) sampling on graph partitions.
 
-**Integer Programming Formulation:** We've developed a robust mathematical model using integer programming to represent the capacitated facility location problem with contiguous service areas.
+falcomchain implements a hierarchical and capacitated ReCom algorithm that simultaneously partitions a dual graph into hierarchical service districts, locate facilities in districts, and allocates expert teams to facilities, while satisfying capacity-demand balance and user-choice constraints such as budget.
 
-**Markov Chain Optimization:** Our solution employs an iterative Markov chain process, where each state represents a valid graph partitioning corresponding to a geographical redistricting scheme.
+> **Status:** Pre-publication. The library is under active development. The Chicago healthcare dataset used for testing is not part of the paper. A new experiment will be designed separately.
 
-**A Novel Sampling Method:** Inspired by the ReComb method (DeFord et al., 2019), we have created an efficient spanning tree sampling technique to explore the solution space efficiently.
+---
 
-**Local Search Algorithms:** We have improved upon two flip-based local search algorithms, providing a benchmark for our sampling method.
+## What it does
 
-**Chicago Case Study:** We apply our method to a real-world scenario, optimizing the location of new primary care facilities in Chicago while reducing the healthcare access inequality via public transportation.
+Given a graph where nodes are geographic units (e.g., census blocks) with population attributes, falcomchain:
 
-**Transportation Network Analysis:** We have constructed a real-world transportation network and calculated travel times between candidate facility locations and Census block centroids.
+1. Partitions the graph into contiguous districts using a capacitated spanning tree algorithm
+2. Assigns a number of doctor-nurse teams to each district based on population and capacity constraints
+3. Runs an MCMC chain over the space of valid partitions using hierarchical ReCom proposals
+4. Tracks objectives (compactness, cut edges, radius deviation) to guide or evaluate the chain
 
-**Results:** Our approach yields convincing results in a short timeframe.
-
-**Current Status:** We are in the final stages of preparing our research for publication. Stay tuned for updates on our submission and findings.
-
-**Data**
-
-Chicago Transit Authority GTFS data
-
-Openstreetmap Illinois street data
-
-2020 Illinois Census data at the block level
-
-2020 Chicago tract IDs
-
-Chicago primary care centers, library, and school datasets
-
-**Note:** Illinois block data is removed due to its size. You can find it [here]{https://redistrictingdatahub.org/state/illinois}.
-We extract its Chicago sub-data by matching it with 2020 Chicago tract IDs provided by the City of Chicago [here](https://www.chicago.gov/content/dam/city/depts/fin/municipal_depository/Addendum_2_Attachment_A_Chicago_Census_Tract%20_11_digit.pdf). We cleaned the data and saved it as chicago_tracts.csv in our data folder.
-
-## Prerequisites
-
-This project is developed using Python 3.12. While it is likely that earlier versions of Python 3 may also work, they have not been
-tested and thus cannot be guaranteed to be fully compatible. For best results, using Python 3.12 or higher is recommended.
+---
 
 ## Installation
 
-Pipenv is used for managing project dependencies and virtual environments. Follow these steps to set up
-the project environment using Pipenv:
-
-```markdown
-# Install Pipenv
-pip install pipenv
-
-# Clone the Project Repository
+```bash
 git clone https://github.com/kirtisoglu/Allocation-of-Primary-Care-Centers-in-Chicago
 cd Allocation-of-Primary-Care-Centers-in-Chicago
-
-# Set Up the Environment
-pipenv install
-
-# Activate the Virtual Environment
-pipenv shell
-
-#Deactivate the Environment:
-exit
+pip install -e .
 ```
 
-## DATA
+Requires Python 3.12+.
 
-This project utilizes several datasets to analyze and optimize the allocation of resources in the Chicago Area.
-Data is not stored within the project repository due to its size. Ensure you follow data setup instructions in
-data.txt](data.txt) to properly configure your environment for data handling.
+---
 
-## Running the Project
+## Quick start
 
-To run the project scripts, ensure you are within the activated Pipenv environment and execute Python scripts as follows:
+```python
+from falcomchain.graph import Graph
+from falcomchain.partition import Partition
 
-```bash
-python file_script.py
+# Load your graph (must have 'population' node attribute)
+graph = Graph.from_file("my_graph.geojson")
+
+# Create an initial partition
+partition = Partition.from_random_assignment(
+    graph=graph,
+    pop_target=1500,
+    epsilon=0.1,
+    capacity_level=2,
+)
+
+# Run the chain
+from falcomchain.markovchain import MarkovChain, hierarchical_recom, always_accept
+from functools import partial
+
+proposal = partial(hierarchical_recom, pop_target=1500, epsilon=0.1)
+chain = MarkovChain(proposal=proposal, accept=always_accept, initial_state=partition, total_steps=100)
+
+for state in chain:
+    print(state.step, len(state.parts))
 ```
 
-Replace `file_script.py` with the actual script file you want to execute.
+---
 
-## Contributing
+## Repository structure
 
-Contributors are welcome! Please fork the repository and submit pull requests with your proposed changes.
-Ensure you follow the project's code style and guidelines.
+See [docs/structure.md](docs/structure.md) for a detailed breakdown of every module.
+
+---
+
+## Algorithm
+
+See [docs/algorithm.md](docs/algorithm.md) for an explanation of ReCom, hierarchical ReCom, capacitated tree partitioning, and the MCMC framework.
+
+---
+
+## Data
+
+See [docs/data.md](docs/data.md) for a description of the data files used for testing and what a new experiment will require.
+
+---
+
+## For AI agents
+
+See [docs/agent_guide.md](docs/agent_guide.md) for a navigation guide to the codebase intended for LLM assistants.
+
+---
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE.txt](LICENSE.txt) file for details.
+MIT License. See [LICENSE.txt](LICENSE.txt).

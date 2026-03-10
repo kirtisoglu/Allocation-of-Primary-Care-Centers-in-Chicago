@@ -122,7 +122,7 @@ class Tally:
         attribute of nodes.
 
         :param partition: The partition to compute the tally for.
-        :type partition: :class:`~gerrychain.partition.Partition`
+        :type partition: :class:`~falcomchain.partition.Partition`
 
         :returns: A dictionary keyed by the parts of the partition, with values
             being the sum of the "field" attribute of nodes in that part.
@@ -147,7 +147,7 @@ class Tally:
         of nodes, given proposed changes.
 
         :param partition: The partition to update the tally for.
-        :type partition: :class:`~gerrychain.partition.Partition`
+        :type partition: :class:`~falcomchain.partition.Partition`
 
         :returns: A dictionary keyed by the parts of the partition, with
             the updated tallies of the "field" attribute of nodes in each part.
@@ -174,7 +174,7 @@ class Tally:
 def compute_out_flow(graph, fields: Union[str, List[str]], flow: Dict) -> int:
     """
     :param graph: The graph that the partition is defined on.
-    :type graph: :class:`~gerrychain.graph.Graph`
+    :type graph: :class:`~falcomchain.graph.Graph`
     :param fields: The list of node attributes that you want to tally. Or just a
         single attribute name as a string.
     :type fields: Union[str, List[str]]
@@ -192,7 +192,7 @@ def compute_out_flow(graph, fields: Union[str, List[str]], flow: Dict) -> int:
 def compute_in_flow(graph, fields: Union[str, List[str]], flow: Dict) -> int:
     """
     :param graph: The graph that the partition is defined on.
-    :type graph: :class:`~gerrychain.graph.Graph`
+    :type graph: :class:`~falcomchain.graph.Graph`
     :param fields: The list of node attributes that you want to tally. Or just a
         single attribute name as a string.
     :type fields: Union[str, List[str]]

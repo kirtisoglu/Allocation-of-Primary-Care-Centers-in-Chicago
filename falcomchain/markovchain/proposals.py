@@ -34,20 +34,30 @@ class ValueWarning(UserWarning):
 def hierarchical_recom(
     partition: Partition,
     epsilon: float,
-    pop_target: float,
+    demand_target: float,
     density: Optional[float] = None,
     snapshot: bool = True,
 ) -> Partition:
-    """_summary_
-    Args:
-        partition (Partition): _description_
-        pop_target (int): _description_
-        column_names (tuple[str]): _description_
-        epsilon (float): _description_
-        density (float, optional): _description_. Defaults to None.
-        supergraph (str, optional): Local or global. Defaults to None.
-    Returns:
-        Partition: _description_
+    """
+    Proposes a new partition via two-level hierarchical ReCom.
+
+    At the upper level, two adjacent super-districts are selected from the supergraph
+    and merged into a single superdistrict. At the lower level, the merged region is
+    re-split using a capacitated spanning tree such that the total team capacity of the
+    new districts equals the total capacity of the merged superdistrict.
+
+    :param partition: The current partition.
+    :type partition: Partition
+    :param epsilon: Maximum relative demand deviation allowed, as a fraction of demand_target.
+    :type epsilon: float
+    :param demand_target: Target demand per district.
+    :type demand_target: float
+    :param density: Optional density parameter passed to the tree method.
+    :type density: float, optional
+    :param snapshot: If True, saves tree snapshots for debugging. Defaults to True.
+    :type snapshot: bool
+    :returns: The new partition after the hierarchical flip.
+    :rtype: Partition
     """
 
     method = partial(
@@ -63,41 +73,23 @@ def hierarchical_recom(
     ##superflip = method(
     ##    graph=partition.supergraph, n_teams=all_teams, supergraph=True
     ##)
-    try:
-        acut_object = bipartition_tree(
-            graph=partition.supergraph.copy(),
-            pop_target=1500,
-            capacity_level=partition.capacity_level,
-            n_teams=sum(partition.teams.values()),
-            epsilon=epsilon / 2,
-            two_sided=False,
-            supergraph=True,
-            density=False,
-            snapshot=snapshot,
-            max_attempts=10,
-            iteration=partition.step,
-        )
-    except Exception:
-        raise
-    
-    
-    # ("Cut", "node subnodes assigned_teams pop")
-    # For now, we merge only one super district picking it randomly
-    ##super_partition = {
-    ##    super_district: set() for super_district in set(superflip.flips.values())
-    ##}
-    ##for supernode in superflip.flips.keys():
-    ##    super_partition[superflip.flips[supernode]].add(supernode)
-    ##superdistrict_to_merge = random.choice(list(super_partition.keys()))
-    ##superflip.add_merged_ids(super_partition[superdistrict_to_merge])
+    acut_object = bipartition_tree(
+        graph=partition.supergraph.copy(),
+        demand_target=1500,
+        capacity_level=partition.capacity_level,
+        n_teams=sum(partition.teams.values()),
+        epsilon=epsilon / 2,
+        two_sided=False,
+        supergraph=True,
+        density=False,
+        snapshot=snapshot,
+        max_attempts=10,
+        iteration=partition.step,
+    )
 
     # LOWER LEVEL: resplitting merged districts
-
-    ##subgraph = partition.graph.graph.subgraph(
-    ##    set.union(*(set(partition.parts[part]) for part in superflip.merged_ids)))
-
-    new_pop_target = acut_object.pop / acut_object.assigned_teams
-    # print("pop in superdistrict", acut_object.pop)
+    new_demand_target = acut_object.demand / acut_object.assigned_teams
+    # print("demand in superdistrict", acut_object.demand)
 
     merge = frozenset(acut_object.subnodes)
     superflip = Flip(merged_ids=merge, super_cut_object=acut_object)
@@ -111,24 +103,18 @@ def hierarchical_recom(
         node: partition.assignment.mapping[node] for node in subgraph.nodes
     }
 
-    try:
-        flip = method(
-            graph=subgraph,
-            n_teams=int(
-                acut_object.assigned_teams
-            ),  ##sum(superflip.team_flips.values()),
-            merged_ids=set(merge.copy()),  ##superflip.merged_ids,
-            assignments=sub_assignments,
-            max_id=max_id,
-            pop_target=new_pop_target,
-            epsilon=epsilon,
-            snapshot=snapshot,
-            debt=(acut_object.pop - acut_object.assigned_teams * 1500),
-            iteration=partition.step
-        )
-    except Exception:
-        raise
-
+    flip = method(
+        graph=subgraph,
+        n_teams=int(acut_object.assigned_teams),
+        merged_ids=set(merge.copy()),
+        assignments=sub_assignments,
+        max_id=max_id,
+        demand_target=new_demand_target,
+        epsilon=epsilon,
+        snapshot=snapshot,
+        debt=(acut_object.demand - acut_object.assigned_teams * 1500),
+        iteration=partition.step,
+    )
     flip = flip.add_merged_ids(merge)
 
     return partition.perform_flip(flipp=flip, superflipp=superflip)
@@ -136,7 +122,7 @@ def hierarchical_recom(
 
 def recom(  # Note: recomb is called for each state of the chain. Parameters must be static for the states. (should we cache some of them in Partition?)
     partition: Partition,
-    pop_target: int,
+    demand_target: int,
     column_names: tuple[str],
     epsilon: float,
     density: float = None,
@@ -147,17 +133,17 @@ def recom(  # Note: recomb is called for each state of the chain. Parameters mus
     is selected at random and merged into a single district. The region is then split
     into two new districts by generating a spanning tree using the Kruskal/Karger
     algorithm and cutting an edge at random. The edge is checked to ensure that it
-    separates the region into two new districts that are population balanced, and,
+    separates the region into two new districts that are demand balanced, and,
     if not, a new edge is selected at random and the process is repeated.
 
     :param partition: The initial partition.
     :type partition: Partition
-    :param pop_col: The name of the population column.
-    :type pop_col: str
-    :param pop_target: The target population for each district.
-    :type pop_target: Union[int,float]
-    :param epsilon: The epsilon value for population deviation as a percentage of the
-        target population.
+    :param demand_col: The name of the demand column.
+    :type demand_col: str
+    :param demand_target: The target demand for each district.
+    :type demand_target: Union[int,float]
+    :param epsilon: The epsilon value for demand deviation as a percentage of the
+        target demand.
     :type epsilon: float
     :param node_repeats: The number of times to repeat the bipartitioning step. Default is 1.
     :type node_repeats: int, optional
@@ -196,7 +182,7 @@ def recom(  # Note: recomb is called for each state of the chain. Parameters mus
                 graph=subgraph.graph,
                 column_names=column_names,
                 n_teams=n_teams,
-                pop_target=pop_target,
+                demand_target=demand_target,
                 epsilon=epsilon,
                 capacity_level=partition.capacity_level,
                 density=density,
@@ -231,7 +217,7 @@ def propose_chunk_flip(partition: Partition) -> Partition:
     :param partition: The current partition to propose a flip from.
     :type partition: Partition
 
-    :returns: A possible next `~gerrychain.Partition`
+    :returns: A possible next `~falcomchain.partition.Partition`
     :rtype: Partition
     """
     flips = dict()
@@ -261,7 +247,7 @@ def propose_random_flip(partition: Partition) -> Partition:
     :param partition: The current partition to propose a flip from.
     :type partition: Partition
 
-    :returns: A possible next `~gerrychain.Partition`
+    :returns: A possible next `~falcomchain.partition.Partition`
     :rtype: Partition
     """
     if len(partition["cut_edges"]) == 0:

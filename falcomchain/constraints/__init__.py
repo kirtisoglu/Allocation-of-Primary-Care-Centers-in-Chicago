@@ -1,6 +1,6 @@
 """
-The :mod:`gerrychain.constraints` module provides a collection of constraint
-functions and helper classes for the validation step in GerryChain.
+The :mod:`falcomchain.constraints` module provides a collection of constraint
+functions and helper classes for the validation step in falcomchain.
 
 ==================================== ==========================================
 Helper classes
@@ -30,7 +30,7 @@ Each new step proposed to the chain is passed off to the "validator" functions
 here to determine whether or not the step is valid. If it is invalid (breaks
 contiguity, for instance), then the step is immediately rejected.
 
-A validator should take in a :class:`~gerrychain.partition.Partition` instance,
+A validator should take in a :class:`~falcomchain.partition.Partition` instance,
 and should return whether or not the instance is valid according to their
 rules. Many top-level functions following this signature in this module are
 examples of this.
@@ -63,7 +63,7 @@ from .validity import (
     deviation_from_ideal,
     districts_within_tolerance,
     no_vanishing_districts,
-    within_percent_of_ideal_population,
+    within_percent_of_ideal_demand,
 )
 
 __all__ = [
@@ -86,6 +86,6 @@ __all__ = [
     "deviation_from_ideal",
     "districts_within_tolerance",
     "no_vanishing_districts",
-    "within_percent_of_ideal_population",
+    "within_percent_of_ideal_demand",
     "Bounds",
 ]

@@ -1,6 +1,6 @@
 """
 This module provides tools and algorithms for manipulating and analyzing graphs,
-particularly focused on partitioning graphs based on population data. It leverages the
+particularly focused on partitioning graphs based on demand data. It leverages the
 NetworkX library to handle graph structures and implements various algorithms for graph
 partitioning and tree traversal.
 
@@ -10,7 +10,7 @@ Key functionalities include:
   and each node keeps total weights of the subtrees beneath the node for searching a cut edge using breadth-first search.
 - Random and uniform spanning tree generation for graph partitioning.
 - Search functions for finding cut edges in a tree and supertree.
-- Functions for finding balanced edge cuts in a populated graph
+- Functions for finding balanced edge cuts in a demand graph
 
 Dependencies:
 
@@ -51,11 +51,11 @@ class SpanningTree:
     :type subsets: Dict
     :ivar population: A dictionary mapping nodes to their populations.
     :type population: Dict
-    :ivar tot_pop: The total population of the graph.
-    :type tot_pop: Union[int, float]
-    :ivar ideal_pop: The ideal population for each district.
-    :type ideal_pop: float
-    :ivar epsilon: The tolerance for population deviation from the ideal population within each district.
+    :ivar total_demand: The total demand of the graph.
+    :type total_demand: Union[int, float]
+    :ivar ideal_demand: The ideal demand for each district.
+    :type ideal_demand: float
+    :ivar epsilon: The tolerance for demand deviation from the ideal demand within each district.
     :type epsilon: float
     :ivar preccessor: The predecessor
     :type preccessor: Dict
@@ -68,12 +68,12 @@ class SpanningTree:
     __slots__ = (
         "graph",
         "root",
-        "ideal_pop",
+        "ideal_demand",
         "n_teams",
         "capacity_level",
         "epsilon",
         "successors",
-        "tot_pop",
+        "total_demand",
         "supertree",
         "two_sided",
         "tot_candidates",
@@ -82,7 +82,7 @@ class SpanningTree:
     def __init__(
         self,
         graph,
-        ideal_pop,
+        ideal_demand,
         epsilon,
         capacity_level,
         n_teams: int,
@@ -93,7 +93,7 @@ class SpanningTree:
         self.supertree = supergraph  # remove and use supergraph
         self.graph = graph
 
-        self.ideal_pop = ideal_pop
+        self.ideal_demand = ideal_demand
         self.root = random.choice(
             list(node for node in self.graph.nodes if self.graph.degree(node) > 1)
         )
@@ -105,35 +105,35 @@ class SpanningTree:
         self.two_sided = two_sided
 
         if self.supertree == True:
-            accumulation_columns = {"population", "area", "n_teams"}
+            accumulation_columns = {"demand", "area", "n_teams"}
         else:
             self.tot_candidates = sum(
                 1
                 for node in self.graph.nodes
                 if self.graph.nodes[node]["candidate"] == 1
             )
-            accumulation_columns = {"population", "area", "candidate"}
+            accumulation_columns = {"demand", "area", "candidate"}
 
         self.successors = self.find_successors()
         accumulate_tree(self, accumulation_columns)
-        self.tot_pop = self.graph.nodes[self.root]["population"]
+        self.total_demand = self.graph.nodes[self.root]["demand"]
 
     def find_successors(self) -> Dict:
         return {a: b for a, b in nx.bfs_successors(self.graph, self.root)}
 
-    def has_ideal_pop(self, assign_team, pop):
-        return abs(pop - assign_team * self.ideal_pop) <= self.ideal_pop * self.epsilon
+    def has_ideal_demand(self, assign_team, pop):
+        return abs(pop - assign_team * self.ideal_demand) <= self.ideal_demand * self.epsilon
 
-    def complement_has_the_ideal_pop(self, assign_team, pop):
+    def complement_has_the_ideal_demand(self, assign_team, pop):
         return (
-            abs((self.tot_pop - pop) - assign_team * self.ideal_pop)
-            <= self.ideal_pop * self.epsilon
+            abs((self.total_demand - pop) - assign_team * self.ideal_demand)
+            <= self.ideal_demand * self.epsilon
         )
 
-    def complement_has_ideal_pop_too(self, assign_team, pop):
+    def complement_has_ideal_demand_too(self, assign_team, pop):
         return (
-            abs((self.tot_pop - pop) - (self.n_teams - assign_team) * self.ideal_pop)
-            <= self.ideal_pop * self.epsilon
+            abs((self.total_demand - pop) - (self.n_teams - assign_team) * self.ideal_demand)
+            <= self.ideal_demand * self.epsilon
         )
 
     def has_ideal_density(self, node):
@@ -153,7 +153,7 @@ class SpanningTree:
         return {
             node
             for node, data in self.graph.nodes(data=True)
-            if data["population"] > 2 * self.ideal_pop / 3
+            if data["demand"] > 2 * self.ideal_demand / 3
         }
 
     def facility_remarkable_nodes(self):
@@ -186,7 +186,7 @@ class SpanningTree:
 
 def accumulate_tree(tree: SpanningTree, accumulation_columns):
     """
-    Accumulates population, area and facility attributes for the subtree under
+    Accumulates demand, area and facility attributes for the subtree under
     each node by traversing the graph using a depth-first search.
     return: None
     """
@@ -319,7 +319,7 @@ def compute_subtree_nodes(tree, succ, root) -> Dict:
 
 """  ------------------------------ Main Functions ------------------------------  """
 # Tuple that is used in the find_balanced_edge_cuts function
-Cut = namedtuple("Cut", "node subnodes assigned_teams pop")
+Cut = namedtuple("Cut", "node subnodes assigned_teams demand")
 Cut.__doc__ = "Represents a cut in a graph."
 Cut.node.__doc__ = ""
 Cut.subnodes.__doc__ = (
@@ -328,7 +328,7 @@ Cut.subnodes.__doc__ = (
 Cut.assigned_teams.__doc__ = (
     "The number of doctor-nurse teams for the subtree beneath the cut edge."
 )
-Cut.pop.__doc__ = "Total population of nodes in Cut.subset"
+Cut.demand.__doc__ = "Total demand of nodes in Cut.subset"
 
 
 @dataclass(frozen=True)
@@ -348,12 +348,12 @@ def two_sided_cut(h: SpanningTree, density_check) -> List[Cut]:
     nodes = h.facility_remarkable_nodes()
 
     for node in nodes:
-        pop = h.graph.nodes[node]["population"]
+        pop = h.graph.nodes[node]["demand"]
         for assign_team in range(1, min(h.capacity_level + 1, h.n_teams + 1)):
 
-            if h.has_ideal_pop(assign_team, pop):  # 3. workload
+            if h.has_ideal_demand(assign_team, pop):  # 3. workload
                 if node == h.root or (
-                    h.complement_has_ideal_pop_too(  # 4. compelement's workload too
+                    h.complement_has_ideal_demand_too(  # 4. compelement's workload too
                         assign_team, pop
                     )
                     and h.n_teams - assign_team > 0
@@ -363,7 +363,7 @@ def two_sided_cut(h: SpanningTree, density_check) -> List[Cut]:
                             node=node,
                             subnodes=frozenset(_part_nodes(h.successors, node)),
                             assigned_teams=assign_team,
-                            pop=pop,
+                            demand=pop,
                         )
                     )
     return cuts
@@ -374,19 +374,19 @@ def one_sided_cut(h: SpanningTree, density_check):
     nodes = h.graph.nodes
 
     for node in nodes:
-        pop = h.graph.nodes[node]["population"]
+        pop = h.graph.nodes[node]["demand"]
 
         for assign_team in range(1, min(h.capacity_level + 1, h.n_teams + 1)):
-            if h.has_ideal_pop(assign_team, pop) and h.has_facility(node):
+            if h.has_ideal_demand(assign_team, pop) and h.has_facility(node):
                 cuts.append(
                     Cut(
                         node=node,
                         subnodes=frozenset(_part_nodes(h.successors, node)),
                         assigned_teams=assign_team,
-                        pop=pop,
+                        demand=pop,
                     )
                 )
-            elif h.complement_has_the_ideal_pop(
+            elif h.complement_has_the_ideal_demand(
                 assign_team, pop
             ) and h.complement_has_facility(node):
                 cuts.append(
@@ -396,7 +396,7 @@ def one_sided_cut(h: SpanningTree, density_check):
                             set(nodes) - _part_nodes(h.successors, node)
                         ),
                         assigned_teams=assign_team,
-                        pop=(h.tot_pop - pop),
+                        demand=(h.total_demand - pop),
                     )
                 )
     return cuts
@@ -406,7 +406,7 @@ def find_edge_cuts(h: SpanningTree, density_check: Optional[float] = None) -> Li
     """
     This function takes a SpanningTree object as input and returns a list of balanced edge cuts.
     A balanced edge cut is defined as a cut that divides the graph into two subsets, such that
-    the population of each subset is close to the ideal population defined by the SpanningTree object.
+    the demand of each subset is close to the ideal demand defined by the SpanningTree object.
 
     :param h: The SpanningTree object representing the graph.
     :param add_root: If set to True, an artifical node is connected to root and edge is considered as a possible cut.
@@ -414,7 +414,7 @@ def find_edge_cuts(h: SpanningTree, density_check: Optional[float] = None) -> Li
     :returns: A list of balanced edge cuts.
     """
     # print("--------------iteration starts")
-    # print("remaining pop", h.tot_pop)
+    # print("remaining demand", h.total_demand)
 
     if h.two_sided == True:
         cuts = two_sided_cut(h, density_check)
@@ -422,9 +422,9 @@ def find_edge_cuts(h: SpanningTree, density_check: Optional[float] = None) -> Li
         cuts = one_sided_cut(h, density_check)
 
     # print("length of cuts", len(cuts))
-    # print("ideal pop", h.ideal_pop)
+    # print("ideal demand", h.ideal_demand)
     # print("epsilon", h.epsilon)
-    # print("root pop", h.graph.nodes[h.root][h.pop_col])
+    # print("root demand", h.graph.nodes[h.root][h.demand_col])
     # print("root facility", h.graph.nodes[h.root][h.facility_col])
     # print("--------------iteration ends")
 
@@ -438,7 +438,7 @@ def find_superedge_cuts(
     """
     This function takes a SpanningTree object as input and returns a list of balanced edge cuts.
     A balanced edge cut is defined as a cut that divides the graph into two subsets, such that
-    the population of each subset is close to the ideal population defined by the SpanningTree object.
+    the demand of each subset is close to the ideal demand defined by the SpanningTree object.
 
     :param h: The SpanningTree object representing the graph.
     :param add_root: If set to True, an artifical node is connected to root and edge is considered as a possible cut.
@@ -450,50 +450,50 @@ def find_superedge_cuts(
 
     for node in nodes:
         teams = nodes[node]["n_teams"]
-        pop = nodes[node]["population"]
+        pop = nodes[node]["demand"]
 
         # print("-------------------------")
         # print("supernode", node)
         # print("number of teams in the super subtree", teams)
-        # print("pop of the super subtree", pop)
-        # print("total pop of the subtree", h.tot_pop)
+        # print("demand of the super subtree", pop)
+        # print("total demand of the subtree", h.total_demand)
         # print("capacity level", h.capacity_level)
-        # print("ideal pop", h.ideal_pop)
+        # print("ideal demand", h.ideal_demand)
         # print("epsilon", h.epsilon)
 
         if h.two_sided:
             if (
                 teams >= 2
-                and abs(pop - teams * h.ideal_pop) <= h.ideal_pop * teams * h.epsilon
+                and abs(pop - teams * h.ideal_demand) <= h.ideal_demand * teams * h.epsilon
             ):
                 if (
                     node == h.root
-                    or abs((h.tot_pop - pop) - (h.n_teams - teams) * h.ideal_pop)
-                    <= h.ideal_pop * (h.n_teams - teams) * h.epsilon
+                    or abs((h.total_demand - pop) - (h.n_teams - teams) * h.ideal_demand)
+                    <= h.ideal_demand * (h.n_teams - teams) * h.epsilon
                 ):
                     cuts.append(
                         Cut(
                             node=node,
                             subnodes=frozenset(_part_nodes(h.successors, node)),
                             assigned_teams=teams,
-                            pop=pop,
+                            demand=pop,
                         )
                     )
         else:  # one sided
             if (2 <= teams <= h.capacity_level) and abs(
-                pop - teams * h.ideal_pop
-            ) <= h.ideal_pop * teams * h.epsilon:
+                pop - teams * h.ideal_demand
+            ) <= h.ideal_demand * teams * h.epsilon:
                 cuts.append(
                     Cut(
                         node=node,
                         subnodes=frozenset(_part_nodes(h.successors, node)),
                         assigned_teams=teams,
-                        pop=pop,
+                        demand=pop,
                     )
                 )
             elif (2 <= h.n_teams - teams <= h.capacity_level) and abs(
-                (h.tot_pop - pop) - teams * h.ideal_pop
-            ) <= h.ideal_pop * h.epsilon:
+                (h.total_demand - pop) - teams * h.ideal_demand
+            ) <= h.ideal_demand * h.epsilon:
                 cuts.append(
                     Cut(
                         node=node,
@@ -501,7 +501,7 @@ def find_superedge_cuts(
                             set(nodes) - _part_nodes(h.successors, node)
                         ),
                         assigned_teams=teams,
-                        pop=(h.tot_pop - pop),
+                        demand=(h.total_demand - pop),
                     )
                 )
     return cuts
@@ -509,7 +509,7 @@ def find_superedge_cuts(
 
 def bipartition_tree(
     graph: nx.Graph,
-    pop_target: Union[int, float],
+    demand_target: Union[int, float],
     epsilon: float,
     capacity_level: int,
     n_teams: int,
@@ -525,13 +525,13 @@ def bipartition_tree(
     """
     This function finds a balanced 2 partition of a graph by drawing a
     spanning tree and finding an edge to cut that leaves at most an epsilon
-    imbalance between the populations of the parts. If a root fails, a new tree is drawn.
+    imbalance between the demands of the parts. If a root fails, a new tree is drawn.
 
     :param graph: The graph to partition.
     :param column_names:
-    :param pop_target: The target population for the returned subset of nodes.
-    :param epsilon: The allowable deviation from ``pop_target`` (as a percentage of
-        ``pop_target``) for the subgraph's population.
+    :param demand_target: The target demand for the returned subset of nodes.
+    :param epsilon: The allowable deviation from ``demand_target`` (as a percentage of
+        ``demand_target``) for the subgraph's demand.
     :param capacity_level: The maximum number of doctor-nurse teams in a facility,
         If it is 1, n_teams many districts are created.
     :param n_teams: Number of doctor-nurse teams for the facilities in the subgraph.
@@ -551,7 +551,7 @@ def bipartition_tree(
 
         h = SpanningTree(
             graph=spanning_tree,
-            ideal_pop=pop_target,
+            ideal_demand=demand_target,
             epsilon=epsilon,
             n_teams=n_teams,
             capacity_level=capacity_level,
@@ -617,7 +617,7 @@ def determine_district_id(ids, max_id, assignments, district_nodes):
 def capacitated_recursive_tree(
     graph: nx.Graph,
     n_teams: int,
-    pop_target: int,  # think about this. union of two districts may get far from average in population
+    demand_target: int,  # think about this. union of two districts may get far from average in demand
     epsilon: float,
     capacity_level: int,
     density=None,
@@ -636,9 +636,9 @@ def capacitated_recursive_tree(
     :param filtered_parts:
     :param n_parts:
     :param n_teams: Total number of doctor-nurse teams for all facilities.
-    :param pop_target: Target population for each part of the partition.
+    :param demand_target: Target demand for each part of the partition.
     :param column_names:
-    :param epsilon: How far (as a percentage of ``pop_target``) from ``pop_target`` the parts of the partition can be.
+    :param epsilon: How far (as a percentage of ``demand_target``) from ``demand_target`` the parts of the partition can be.
     :param capacity_level: The maximum number of doctor-nurse teams in a facility, If it is 1, n_teams many districts are created.
     :param density: Defaluts to None.
     :param ids: set of ids whose districts are merged
@@ -658,48 +658,48 @@ def capacitated_recursive_tree(
     hired_teams = 1
 
     # We keep a running tally of deviation from ``epsilon`` at each partition
-    # and use it to tighten the population constraints on a per-partition
+    # and use it to tighten the demand constraints on a per-partition
     # basis such that every partition, including the last partition, has a
-    # population within +/-``epsilon`` of the target population.
-    # For instance, if district n's population exceeds the target by 2%
-    # with a +/-2% epsilon, then district n+1's population should be between
-    # 98% of the target population and the target population.
+    # demand within +/-``epsilon`` of the target demand.
+    # For instance, if district n's demand exceeds the target by 2%
+    # with a +/-2% epsilon, then district n+1's demand should be between
+    # 98% of the target demand and the target demand.
     # "Change  this later"
-    # Capacity level update: We multiply min_pop and max_pop by capacity level of a
-    # district to set its population target correctly. This enlarges error bounds
-    # for districts with high population densities.
+    # Capacity level update: We multiply min_demand and max_demand by capacity level of a
+    # district to set its demand target correctly. This enlarges error bounds
+    # for districts with high demand densities.
 
     # print(f"------ recursive function starts.")
     # print(f"num of teams {n_teams}.")
-    # print(print(f"total pop {sum(graph.nodes[node]["population"] for node in remaining_nodes)}."))
-    min_pop = pop_target * (1 - epsilon)
-    max_pop = pop_target * (1 + epsilon)
-    check_pop = lambda x: min_pop <= x <= max_pop
+    # print(print(f"total demand {sum(graph.nodes[node]["demand"] for node in remaining_nodes)}."))
+    min_demand = demand_target * (1 - epsilon)
+    max_demand = demand_target * (1 + epsilon)
+    check_demand = lambda x: min_demand <= x <= max_demand
 
     # new_epsilon = epsilon
-    # new_pop_target = pop_target
+    # new_demand_target = demand_target
     while remaining_teams > 0:  # better to take len(remaining_nodes) > 0
 
         two_sided = remaining_teams <= capacity_level  # If True ...
 
         # if two_sided==False:
-        min_pop = max(pop_target * (1 - epsilon), pop_target * (1 - epsilon) - debt)
-        max_pop = min(pop_target * (1 + epsilon), pop_target * (1 + epsilon) - debt)
+        min_demand = max(demand_target * (1 - epsilon), demand_target * (1 - epsilon) - debt)
+        max_demand = min(demand_target * (1 + epsilon), demand_target * (1 + epsilon) - debt)
 
-        new_pop_target = (min_pop + max_pop) / 2
-        new_epsilon = (max_pop - min_pop) / (2 * new_pop_target)
+        new_demand_target = (min_demand + max_demand) / 2
+        new_epsilon = (max_demand - min_demand) / (2 * new_demand_target)
 
         # else:
-        #    new_pop_target=1500
+        #    new_demand_target=1500
         #    new_epsilon=0.1
-        # print("min pop, max pop:", min_pop, max_pop)
-        # print("new pop target:", new_pop_target)
+        # print("min demand, max demand:", min_demand, max_demand)
+        # print("new demand target:", new_demand_target)
         # print("new epsilon:", new_epsilon)
 
         try:
             cut_object = bipartition_tree(
                 graph.subgraph(remaining_nodes),
-                pop_target=new_pop_target,
+                demand_target=new_demand_target,
                 capacity_level=capacity_level,
                 n_teams=remaining_teams,
                 epsilon=new_epsilon,
@@ -715,11 +715,11 @@ def capacitated_recursive_tree(
 
         hired_teams = cut_object.assigned_teams  # number of r\
         # print("hired teams", hired_teams)
-        # print("district pop:", cut_object.pop)
+        # print("district demand:", cut_object.demand)
         district_nodes = cut_object.subnodes
-        pop = cut_object.pop
+        pop = cut_object.demand
 
-        if not check_pop(pop / hired_teams):
+        if not check_demand(pop / hired_teams):
             raise PopulationBalanceError()
 
         # determine district id
@@ -743,7 +743,7 @@ def capacitated_recursive_tree(
         current_team_flips[district_id] = hired_teams
 
         # updates for the next iteration
-        debt += pop - pop_target * hired_teams
+        debt += pop - demand_target * hired_teams
         remaining_teams -= hired_teams
 
         remaining_nodes -= district_nodes
@@ -757,7 +757,7 @@ def capacitated_recursive_tree(
                 iteration,
                 district_nodes,
                 hired_teams,
-                cut_object.pop,
+                cut_object.demand,
                 district_id,
                 debt,
                 merged_ids,

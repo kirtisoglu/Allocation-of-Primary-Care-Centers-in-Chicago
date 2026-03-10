@@ -8,7 +8,7 @@ from .bounds import Bounds
 class Validator:
     """A single callable for checking that a partition passes a collection of
     constraints. Intended to be passed as the ``is_valid`` parameter when
-    instantiating :class:`~gerrychain.MarkovChain`.
+    instantiating :class:`~falcomchain.markovchain.MarkovChain`.
 
     This class is meant to be called as a function after instantiation; its
     return is ``True`` if all validators pass, and ``False`` if any one fails.
@@ -58,55 +58,55 @@ class Validator:
         return f"Validator(constraints={constraint_names})"
 
 
-def within_percent_of_ideal_population(
-    initial_partition, percent: float = 0.1, pop_key: str = "population"
+def within_percent_of_ideal_demand(
+    initial_partition, percent: float = 0.1, demand_key: str = "demand"
 ) -> Bounds:
     """
     Require that all districts are within a certain percent of "ideal" (i.e.,
-    uniform) population.
+    uniform) demand.
 
-    Ideal population is defined as "total population / number of districts."
+    Ideal demand is defined as "total demand / number of districts."
 
     :param initial_partition: Starting partition from which to compute district information.
     :type initial_partition: Partition
     :param percent: Allowed percentage deviation. Default is 1%.
     :type percent: float, optional
-    :param pop_key: The name of the population
-        :class:`Tally <gerrychain.updaters.Tally>`. Default is ``"population"``.
-    :type pop_key: str, optional
+    :param demand_key: The name of the demand
+        :class:`Tally <falcomchain.tally.Tally>`. Default is ``"demand"``.
+    :type demand_key: str, optional
 
-    :returns: A :class:`.Bounds` constraint on the population attribute identified
-        by ``pop_key``.
+    :returns: A :class:`.Bounds` constraint on the demand attribute identified
+        by ``demand_key``.
     :rtype: Bounds
     """
-    ideal_population = 1500  # make this an input later.
+    ideal_demand = 1500  # make this an input later.
     bounds = {}
     pops = {}
 
     for part in initial_partition.supergraph.nodes:
-        pops[part] = initial_partition.supergraph.nodes[part][pop_key]
+        pops[part] = initial_partition.supergraph.nodes[part][demand_key]
         hired_teams = initial_partition.teams[part]
         bounds[part] = (
-            (1 - percent) * ideal_population * hired_teams,
-            (1 + percent) * ideal_population * hired_teams,
+            (1 - percent) * ideal_demand * hired_teams,
+            (1 + percent) * ideal_demand * hired_teams,
         )
 
     return Bounds(pops, bounds=bounds)
 
 
-def deviation_from_ideal(partition, attribute: str = "population") -> Dict[int, float]:
+def deviation_from_ideal(partition, attribute: str = "demand") -> Dict[int, float]:
     """
     Computes the deviation of the given ``attribute`` from exact equality
-    among parts of the partition. Usually ``attribute`` is the population, and
-    this function is used to compute how far a districting plan is from exact population
+    among parts of the partition. Usually ``attribute`` is the demand, and
+    this function is used to compute how far a districting plan is from exact demand
     equality.
 
     By "deviation" we mean ``(actual_value - ideal)/ideal`` (not the absolute value).
 
     :param partition: A partition.
     :type partition: Partition
-    :param attribute: The :class:`Tally <gerrychain.updaters.Tally>` to
-        compute deviation for. Default is ``"population"``.
+    :param attribute: The :class:`Tally <falcomchain.tally.Tally>` to
+        compute deviation for. Default is ``"demand"``.
     :type attribute: str, optional
 
     :returns: dictionary from parts to their deviation
@@ -122,7 +122,7 @@ def deviation_from_ideal(partition, attribute: str = "population") -> Dict[int, 
 
 
 def districts_within_tolerance(
-    partition, attribute_name: str = "population", percentage: float = 0.1
+    partition, attribute_name: str = "demand", percentage: float = 0.1
 ) -> bool:
     """
     Check if all districts are within a certain percentage of the "smallest"
@@ -131,7 +131,7 @@ def districts_within_tolerance(
     :param partition: Partition class instance
     :type partition: Partition
     :param attrName: String that is the name of an updater in partition. Default is
-        ``"population"``.
+        ``"demand"``.
     :type attrName: str, optional
     :param percentage: What percent (as a number between 0 and 1) difference is allowed.
         Default is 0.1.

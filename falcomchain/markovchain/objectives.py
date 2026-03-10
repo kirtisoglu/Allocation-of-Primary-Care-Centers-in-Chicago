@@ -20,12 +20,14 @@ def squared_radius_deviation(partition):
 
 
 def total_cut_edges(partition):
+    """
+    Returns the total number of cut edges in the partition.
+
+    :param partition: The current partition.
+    :returns: Number of edges that cross district boundaries.
+    :rtype: int
+    """
     return len(partition["cut_edges"])
-
-
-def arcesse_compactness(partition):
-
-    return
 
 
 def compute_polsby_popper(area: float, perimeter: float) -> float:

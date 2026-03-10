@@ -1,13 +1,25 @@
-[tool.black]
-line-length = 88
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
 
-[tool.isort]
-profile = "black"
+[project]
+name = "falcomchain"
+version = "0.1.0"
+description = "MCMC library for capacitated facility location via graph partitioning"
+requires-python = ">=3.10"
+dependencies = [
+    "networkx>=3.0",
+    "geopandas>=0.14",
+    "shapely>=2.0",
+    "pandas>=2.0",
+    "numpy>=1.26",
+    "tqdm>=4.60",
+]
 
-[tool.flake8]
-max-line-length = 88
-exclude = ["venv", "__pycache__"]
+[tool.setuptools.packages.find]
+include = ["falcomchain*"]
 
-[tool.mypy]
-strict = true
-ignore_missing_imports = true
+[project.optional-dependencies]
+candidates = [
+    "scipy>=1.10",
+]

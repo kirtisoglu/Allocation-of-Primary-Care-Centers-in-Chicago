@@ -7,7 +7,7 @@ import networkx
 import pytest
 
 from falcomchain.graph import Graph
-from falcomchain.grid import Grid
+from falcomchain.graph import Grid
 from falcomchain.tree.tree import _part_nodes
 
 
