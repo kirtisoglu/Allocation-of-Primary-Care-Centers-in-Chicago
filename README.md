@@ -79,12 +79,6 @@ See [docs/data.md](docs/data.md) for a description of the data files used for te
 
 ---
 
-## For AI agents
-
-See [docs/agent_guide.md](docs/agent_guide.md) for a navigation guide to the codebase intended for LLM assistants.
-
----
-
 ## License
 
 MIT License. See [LICENSE.txt](LICENSE.txt).
