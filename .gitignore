@@ -7,7 +7,6 @@ __pycache__/
 Markov_Chain/Validity.py
 Markov_Chain/tree_old.py
 .DS_Store
-not_used
 notes
 .gitignore
 tests
@@ -18,3 +17,4 @@ cache/
 docs/
 memory/
 paper/
+not_used/
